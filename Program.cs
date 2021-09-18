@@ -23,6 +23,8 @@ namespace IkIheMusicBot {
 				.UseConsoleLifetime()
 				.ConfigureAppConfiguration(configBuilder => {
 					configBuilder.SetBasePath(Directory.GetCurrentDirectory());
+					configBuilder.AddNewtonsoftJsonFile("appsettings.json");
+					configBuilder.AddNewtonsoftJsonFile("appsettings.secrets.json");
 					configBuilder.AddEnvironmentVariables("IKIHE_");
 					configBuilder.AddCommandLine(args);
 				})

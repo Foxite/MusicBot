@@ -20,7 +20,7 @@ namespace IkIheMusicBot {
 		// }
 
 		[Command("play"), Description("Play something")]
-		public async Task<CommandResult> Play([Description("Search query or URL")] string search) {
+		public async Task<CommandResult> Play([Description("Search query or URL")] string search, [Description("search in category")] LavalinkSearchType searchType = LavalinkSearchType.Youtube) {
 			IReadOnlyList<LavalinkTrack> tracks = await Lavalink.QueueAsync(Context.Guild, ((DiscordMember) Context.User).VoiceState.Channel, search);
 			if (tracks.Count == 0) {
 				return new TextResult(false, "Added zero tracks");

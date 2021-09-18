@@ -27,7 +27,11 @@ namespace IkIheMusicBot.Services {
 		}
 
 		private LavalinkGuildConnection GetGuildConnection(DiscordGuild guild) {
-			return m_Queues.GetOrAdd(guild, _ => new LavalinkQueue(Lavalink.GetIdealNodeConnection().GetGuildConnection(guild))).GetGuildConnection();
+			return GetLavalinkQueue(guild).GetGuildConnection();
+		}
+
+		private LavalinkQueue GetLavalinkQueue(DiscordGuild guild) {
+			return m_Queues.GetOrAdd(guild, _ => new LavalinkQueue(Lavalink.GetIdealNodeConnection().GetGuildConnection(guild)));
 		}
 
 		public async Task<IReadOnlyList<LavalinkTrack>> QueueAsync(DiscordGuild guild, DiscordChannel channel, string search) {
@@ -38,10 +42,20 @@ namespace IkIheMusicBot.Services {
 			} else {
 				result = await gc.GetTracksAsync(search);
 			}
-			foreach (LavalinkTrack track in result.Tracks) {
-				await m_Queues.GetOrAdd(guild, _ => new LavalinkQueue(gc)).AddToQueueAsync(track);
+			if (result.LoadResultType == LavalinkLoadResultType.PlaylistLoaded) {
+				foreach (LavalinkTrack track in result.Tracks) {
+					await GetLavalinkQueue(guild).AddToQueueAsync(track);
+				}
+				return result.Tracks.ToList();
+			} else if (result.LoadResultType is LavalinkLoadResultType.SearchResult or LavalinkLoadResultType.TrackLoaded) {
+				LavalinkTrack track = result.Tracks.First();
+				await GetLavalinkQueue(guild).AddToQueueAsync(track);
+				return new[] { track };
+			} else if (result.LoadResultType is LavalinkLoadResultType.NoMatches) {
+				return Array.Empty<LavalinkTrack>();
+			} else /* if (result.LoadResultType is LavalinkLoadResultType.LoadFailed) */ {
+				throw new Exception($"Failed to load tracks {result.Exception.Severity}: {result.Exception.Message}");
 			}
-			return result.Tracks.ToList();
 		}
 
 		public Task PauseAsync(DiscordGuild guild) {
