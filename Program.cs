@@ -96,6 +96,9 @@ namespace IkIheMusicBot {
 					);
 					if (result is CommandExecutionFailedResult cefr) {
 						Console.WriteLine(cefr.Exception.ToStringDemystified());
+						await interaction.CreateFollowupMessageAsync(new DiscordFollowupMessageBuilder() {
+							Content = "There was a unhandled error while executing the command.",
+						});
 					} else if (result is SuccessfulResult sr) {
 						await interaction.CreateFollowupMessageAsync(new DiscordFollowupMessageBuilder() {
 							Content = "No result (successful)"
@@ -114,8 +117,7 @@ namespace IkIheMusicBot {
 				}
 			} catch (Exception e) {
 				await interaction.CreateFollowupMessageAsync(new DiscordFollowupMessageBuilder() {
-					Content = "There was an error while executing the command.",
-					IsEphemeral = true
+					Content = "There was a serious unhandled error while executing the command.",
 				});
 				Console.WriteLine(e.ToStringDemystified());
 			}

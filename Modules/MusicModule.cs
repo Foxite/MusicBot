@@ -30,8 +30,14 @@ namespace IkIheMusicBot {
 		[Command("play"), Description("Play something")]
 		public async Task<CommandResult> Play([Description("Search query or URL")] string search) {
 			LavalinkSearchType searchType;
-			if (Uri.TryCreate(search, UriKind.Absolute, out _) || await LocalFileExistsAndCanRead(search)) {
+			if (Uri.TryCreate(search, UriKind.Absolute, out _)) {
 				searchType = LavalinkSearchType.Plain;
+			} else if (await LocalFileExistsAndCanRead(search)) {
+				if (search.StartsWith("/mnt/data/Music/")) {
+					searchType = LavalinkSearchType.Plain;
+				} else {
+					return new TextResult(false, "<a:aPES_Hacker:513527552976093204>");
+				}
 			} else {
 				searchType = LavalinkSearchType.Youtube;
 			}

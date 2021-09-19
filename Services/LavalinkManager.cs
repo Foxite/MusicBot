@@ -139,10 +139,17 @@ namespace IkIheMusicBot.Services {
 
 			m_GuildConnection.PlaybackFinished += (_, e) => {
 				if (e.Reason == TrackEndReason.Finished) {
-					return NextSongAsync();
-				} else {
-					return Task.CompletedTask;
+					lock (m_QueueLock) {
+						if (NextTrack != null) {
+							if (Repeat) {
+								m_Queue.AddLast(m_Queue.First!.Value);
+							}
+							m_Queue.RemoveFirst();
+							return NextSongAsync();
+						}
+					}
 				}
+				return Task.CompletedTask;
 			};
 		}
 
