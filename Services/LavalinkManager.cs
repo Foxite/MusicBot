@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using AngleSharp.Dom;
 using DSharpPlus.Entities;
 using DSharpPlus.Lavalink;
 
@@ -29,8 +31,27 @@ namespace IkIheMusicBot.Services {
 			});
 			
 			LavalinkGuildConnection gc = queue.GetGuildConnection();
-			LavalinkLoadResult? result = await gc.GetTracksAsync(searchOrUri, searchType);
 			
+			LavalinkLoadResult result;
+			if (searchType == LavalinkSearchType.Plain && File.Exists(searchOrUri) && searchOrUri.EndsWith(".m3u")) {
+				string[] lines = await File.ReadAllLinesAsync(searchOrUri);
+				var tracks = new List<LavalinkTrack>(lines.Length);
+				foreach (string line_ in lines) {
+					string line = line_;
+					if (!Path.IsPathRooted(line)) {
+						line = Path.Combine(Path.GetDirectoryName(searchOrUri)!, line);
+					}
+					LavalinkLoadResult loadResult = await gc.Node.Rest.GetTracksAsync(line, LavalinkSearchType.Plain);
+					if (loadResult.LoadResultType == LavalinkLoadResultType.TrackLoaded) {
+						tracks.Add(loadResult.Tracks.First());
+						await queue.AddToQueueAsync(loadResult.Tracks.First());
+					}
+				}
+				return tracks;
+			} else {
+				result = await gc.GetTracksAsync(searchOrUri, searchType);
+			}
+
 			if (result.LoadResultType == LavalinkLoadResultType.PlaylistLoaded) {
 				foreach (LavalinkTrack track in result.Tracks) {
 					await GetLavalinkQueue(guild).AddToQueueAsync(track);
@@ -43,7 +64,7 @@ namespace IkIheMusicBot.Services {
 			} else if (result.LoadResultType is LavalinkLoadResultType.NoMatches) {
 				return Array.Empty<LavalinkTrack>();
 			} else /* if (result.LoadResultType is LavalinkLoadResultType.LoadFailed) */ {
-				throw new Exception($"Failed to load tracks {result.Exception.Severity}: {result.Exception.Message}");
+				throw new Exception($"Failed to load tracks (severity: {result.Exception.Severity}): {result.Exception.Message}");
 			}
 		}
 

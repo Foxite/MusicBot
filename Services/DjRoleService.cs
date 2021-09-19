@@ -13,7 +13,7 @@ namespace IkIheMusicBot.Services {
 
 		public bool CheckPermission(DiscordMember member, bool onlyIfRequired) {
 			if (m_Config.DjRoleIsRequired || !onlyIfRequired) {
-				return !member.Roles.Select(role => role.Id).Any(roleId => m_Config.RoleIds.Contains(roleId));
+				return member.Roles.Select(role => role.Id).Any(roleId => m_Config.RoleIds.Contains(roleId));
 			} else {
 				return true;
 			}

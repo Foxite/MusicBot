@@ -36,12 +36,20 @@ namespace IkIheMusicBot {
 		public async Task<CommandResult> Play([Description("Search query or URL")] string search) {
 			LavalinkSearchType searchType;
 			if (Uri.TryCreate(search, UriKind.Absolute, out _)) {
-				searchType = LavalinkSearchType.Plain;
-			} else if (
-				await LocalFileExistsAndCanRead(search) &&
-				LocalMediaConfig.Value.AllowedPathPrefixes.Any(search.StartsWith) &&
-				DjRoleService.CheckPermission(Context.Member, false)) {
-				searchType = LavalinkSearchType.Plain;
+				if (search.StartsWith("/")) {
+					if (DjRoleService.CheckPermission(Context.Member, false)) {
+						if (LocalMediaConfig.Value.AllowedPathPrefixes.Any(search.StartsWith)) {
+							searchType = LavalinkSearchType.Plain;
+						} else {
+							return new TextResult(false, "Local file is outside permitted directories");
+						}
+					} else {
+						//return new TextResult(false, "<a:hackerman:585659270767575040>");
+						searchType = LavalinkSearchType.Plain;
+					}
+				} else {
+					searchType = LavalinkSearchType.Plain;
+				}
 			} else {
 				searchType = LavalinkSearchType.Youtube;
 			}

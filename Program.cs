@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Text;
 using System.Threading.Tasks;
 using DSharpPlus;
 using DSharpPlus.Entities;
@@ -32,6 +33,7 @@ namespace IkIheMusicBot {
 					isc.Configure<CommandServiceConfiguration>(ctx.Configuration.GetSection("CommandServiceConfiguration"));
 					isc.Configure<DjRoleConfig>(ctx.Configuration.GetSection("DjRoleConfig"));
 					isc.Configure<LocalMediaConfig>(ctx.Configuration.GetSection("LocalMediaConfig"));
+					isc.Configure<LavalinkConfig>(ctx.Configuration.GetSection("LavalinkConfig"));
 
 					isc.AddSingleton(isp => new DiscordClient(new DSharpPlus.DiscordConfiguration() {
 						Token = isp.GetRequiredService<IOptions<DiscordConfiguration>>().Value.Token
@@ -59,14 +61,16 @@ namespace IkIheMusicBot {
 				}
 				return Task.CompletedTask;
 			};
+			
+			LavalinkConfig lavalinkConfig = host.Services.GetRequiredService<IOptions<LavalinkConfig>>().Value;
 
 			var endpoint = new ConnectionEndpoint {
-				Hostname = "127.0.0.1", // From your server configuration.
-				Port = 2333 // From your server configuration
+				Hostname = lavalinkConfig.Hostname,
+				Port = lavalinkConfig.Port
 			};
 
-			var lavalinkConfig = new LavalinkConfiguration {
-				Password = "youshallnotpass", // From your server configuration.
+			var lavalinkConfig2 = new LavalinkConfiguration {
+				Password = lavalinkConfig.Password,
 				RestEndpoint = endpoint,
 				SocketEndpoint = endpoint
 			};
@@ -77,7 +81,7 @@ namespace IkIheMusicBot {
 			commandManager.Loading += (_, service, _) => service.AddModules(Assembly.GetExecutingAssembly());
 			await commandManager.ReloadCommandsAsync(startDiscord);
 			
-			await lavalink.ConnectAsync(lavalinkConfig);
+			await lavalink.ConnectAsync(lavalinkConfig2);
 
 			await host.RunAsync();
 		}
@@ -103,6 +107,19 @@ namespace IkIheMusicBot {
 						await interaction.CreateFollowupMessageAsync(new DiscordFollowupMessageBuilder() {
 							Content = "There was a unhandled error while executing the command.",
 						});
+					} else if (result is ChecksFailedResult cfr) {
+						var response = new StringBuilder("One or more checks have failed: ");
+						if (cfr.FailedChecks.Count > 1) {
+							response.AppendLine();
+							foreach ((Qmmands.CheckAttribute check, CheckResult checkResult) in cfr.FailedChecks.Where(tuple => !tuple.Result.IsSuccessful)) {
+								response.AppendLine($"- {checkResult.FailureReason}");
+							}
+						} else {
+							response.Append(cfr.FailedChecks[0].Result.FailureReason);
+						}
+						await interaction.CreateFollowupMessageAsync(new DiscordFollowupMessageBuilder() {
+							Content = response.ToString(),
+						}); 
 					} else if (result is SuccessfulResult sr) {
 						await interaction.CreateFollowupMessageAsync(new DiscordFollowupMessageBuilder() {
 							Content = "No result (successful)"

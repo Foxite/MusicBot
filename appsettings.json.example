@@ -6,7 +6,7 @@
             "Microsoft": "Information"
         }
     },
-    "LavalinkConnectionEndpoint": {
+    "LavalinkConfig": {
         "Hostname": "127.0.0.1",
         "Port": 2333,
         "Password": "youshallnotpass"

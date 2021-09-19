@@ -6,6 +6,7 @@ WORKDIR /src
 COPY ["IkIheMusicBot.csproj", "./"]
 RUN dotnet restore "IkIheMusicBot.csproj"
 COPY . .
+COPY appsettings.json.example appsettings.json
 WORKDIR "/src/"
 RUN dotnet build "IkIheMusicBot.csproj" -c Release -o /app/build
 
