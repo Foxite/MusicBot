@@ -1,5 +1,4 @@
 {
-    "bla": 5,
     "Logging": {
         "LogLevel": {
             "Default": "Debug",
@@ -9,7 +8,8 @@
     },
     "LavalinkConnectionEndpoint": {
         "Hostname": "127.0.0.1",
-        "Port": 2333
+        "Port": 2333,
+        "Password": "youshallnotpass"
     },
     "CommandServiceConfiguration": {
         "StringComparison": 5,
@@ -22,4 +22,23 @@
         "QuotationMarkMap": null,
         "NullableNouns": null
     },
+    "DiscordConfiguration": {
+        "Token": ""
+    },
+    "Notifications": {
+        "Discord": {
+            "WebhookUrl": ""
+        }
+    },
+    "DjRoleConfig": {
+        "DjRoleIsRequired": false,
+        "RoleIds": [
+            
+        ]
+    },
+    "LocalMediaConfig": {
+        "AllowedPathPrefixes": [
+            
+        ]
+    }
 }

@@ -19,21 +19,11 @@
     </ItemGroup>
 
     <ItemGroup>
-      <None Include="appsettings.secrets.json.example">
-        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      </None>
       <None Remove="appsettings.json" />
+      <None Remove="appsettings.secrets.json" />
       <Content Include="appsettings.json">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </Content>
-      <None Remove="appsettings.secrets.json" />
-      <Content Include="appsettings.secrets.json">
-        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      </Content>
-    </ItemGroup>
-
-    <ItemGroup>
-      <Folder Include="Parsers" />
     </ItemGroup>
 
 </Project>

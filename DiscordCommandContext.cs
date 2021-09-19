@@ -9,9 +9,11 @@ namespace IkIheMusicBot {
 		public DiscordChannel Channel { get; }
 		public DiscordGuild Guild { get; }
 		public DiscordUser User { get; }
+		public DiscordMember Member { get; }
 
-		public DiscordCommandContext(IServiceProvider isp, DiscordInteraction interaction) : base(isp) {
+		public DiscordCommandContext(IServiceProvider isp, DiscordInteraction interaction, DiscordMember member) : base(isp) {
 			Interaction = interaction;
+			Member = member;
 			Channel = interaction.Channel;
 			Guild = interaction.Guild;
 			User = interaction.User;

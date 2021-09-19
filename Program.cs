@@ -24,13 +24,14 @@ namespace IkIheMusicBot {
 				.ConfigureAppConfiguration(configBuilder => {
 					configBuilder.SetBasePath(Directory.GetCurrentDirectory());
 					configBuilder.AddNewtonsoftJsonFile("appsettings.json");
-					configBuilder.AddNewtonsoftJsonFile("appsettings.secrets.json");
 					configBuilder.AddEnvironmentVariables("IKIHE_");
 					configBuilder.AddCommandLine(args);
 				})
 				.ConfigureServices((ctx, isc) => {
 					isc.Configure<DiscordConfiguration>(ctx.Configuration.GetSection("DiscordConfiguration"));
 					isc.Configure<CommandServiceConfiguration>(ctx.Configuration.GetSection("CommandServiceConfiguration"));
+					isc.Configure<DjRoleConfig>(ctx.Configuration.GetSection("DjRoleConfig"));
+					isc.Configure<LocalMediaConfig>(ctx.Configuration.GetSection("LocalMediaConfig"));
 
 					isc.AddSingleton(isp => new DiscordClient(new DSharpPlus.DiscordConfiguration() {
 						Token = isp.GetRequiredService<IOptions<DiscordConfiguration>>().Value.Token
@@ -40,6 +41,8 @@ namespace IkIheMusicBot {
 
 					isc.AddSingleton(isp => new CommandService(isp.GetRequiredService<IOptions<CommandServiceConfiguration>>().Value));
 					isc.AddSingleton<CommandManager>();
+					
+					isc.AddSingleton<DjRoleService>();
 
 					isc.AddNotifications()
 						.AddDiscord(ctx.Configuration.GetSection("Notifications").GetSection("Discord"));
@@ -84,7 +87,8 @@ namespace IkIheMusicBot {
 			try {
 				Command command = services.GetRequiredService<CommandManager>().GetCommand(interaction.Data.Name)!;
 				if ((interaction.Data.Options ?? Array.Empty<DiscordInteractionDataOption>()).CountEquals(command.Parameters.Count)) {
-					var ctx = new DiscordCommandContext(services, interaction);
+					DiscordMember member = await interaction.Guild.GetMemberAsync(interaction.User.Id);
+					var ctx = new DiscordCommandContext(services, interaction, member);
 					IResult result = await command.ExecuteAsync(
 						(interaction.Data.Options ?? Array.Empty<DiscordInteractionDataOption>()).Select(option => option.Type switch {
 							//ApplicationCommandOptionType.Channel => ctx.Channel.Guild.GetChannel((ulong) option.Value),

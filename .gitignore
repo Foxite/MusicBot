@@ -2,6 +2,4 @@
 .idea
 **/bin
 **/obj
-appsettings.secrets.json
-
-
+appsettings.json

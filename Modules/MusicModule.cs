@@ -1,16 +1,20 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using DSharpPlus.Entities;
 using DSharpPlus.Lavalink;
 using IkIheMusicBot.Services;
+using Microsoft.Extensions.Options;
 using Qmmands;
 
 namespace IkIheMusicBot {
 	public class MusicModule : ModuleBase<DiscordCommandContext> {
 		public LavalinkManager Lavalink { get; set; } = null!;
+		public DjRoleService DjRoleService { get; set; } = null!;
+		public IOptions<LocalMediaConfig> LocalMediaConfig { get; set; } = null!;
 		
 		// [Command("leave"), Description("Leave your voice channel")]
 		// public Task Leave() {
@@ -28,16 +32,16 @@ namespace IkIheMusicBot {
 		}
 
 		[Command("play"), Description("Play something")]
+		[DjRole(OnlyIfRequired = true)]
 		public async Task<CommandResult> Play([Description("Search query or URL")] string search) {
 			LavalinkSearchType searchType;
 			if (Uri.TryCreate(search, UriKind.Absolute, out _)) {
 				searchType = LavalinkSearchType.Plain;
-			} else if (await LocalFileExistsAndCanRead(search)) {
-				if (search.StartsWith("/mnt/data/Music/")) {
-					searchType = LavalinkSearchType.Plain;
-				} else {
-					return new TextResult(false, "<a:aPES_Hacker:513527552976093204>");
-				}
+			} else if (
+				await LocalFileExistsAndCanRead(search) &&
+				LocalMediaConfig.Value.AllowedPathPrefixes.Any(search.StartsWith) &&
+				DjRoleService.CheckPermission(Context.Member, false)) {
+				searchType = LavalinkSearchType.Plain;
 			} else {
 				searchType = LavalinkSearchType.Youtube;
 			}
@@ -52,6 +56,7 @@ namespace IkIheMusicBot {
 		}
 
 		[Command("resume"), Description("Resume playback")]
+		[DjRole(OnlyIfRequired = true)]
 		public async Task<CommandResult> Resume() {
 			LavalinkTrack? result = await Lavalink.ResumeAsync(Context.Guild);
 			if (result != null) {
@@ -67,11 +72,13 @@ namespace IkIheMusicBot {
 		}
 
 		[Command("pause"), Description("Pause playback")]
+		[DjRole(OnlyIfRequired = true)]
 		public Task Pause() {
 			return Lavalink.PauseAsync(Context.Guild);
 		}
 		
 		[Command("skip", "next"), Description("Skip this song")]
+		[DjRole(OnlyIfRequired = true)]
 		public async Task<CommandResult> Skip() {
 			LavalinkTrack? skippedTrack = await Lavalink.SkipAsync(Context.Guild);
 			if (skippedTrack == null) {
@@ -81,7 +88,7 @@ namespace IkIheMusicBot {
 			}
 		}
 
-		[Command("repeat"), Description("Toggle repeating")]
+		[Command("repeat"), Description("Toggle repeating"), DjRole]
 		public CommandResult ToggleRepeat() {
 			bool? repeating = Lavalink.GetRepeating(Context.Guild);
 			if (repeating.HasValue) {
