@@ -1,10 +1,13 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.Contracts;
 using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
+using Discord;
 using DSharpPlus;
 using DSharpPlus.Entities;
 using DSharpPlus.EventArgs;
@@ -34,6 +37,7 @@ namespace IkIheMusicBot {
 					isc.Configure<DjRoleConfig>(ctx.Configuration.GetSection("DjRoleConfig"));
 					isc.Configure<LocalMediaConfig>(ctx.Configuration.GetSection("LocalMediaConfig"));
 					isc.Configure<LavalinkConfig>(ctx.Configuration.GetSection("LavalinkConfig"));
+					isc.Configure<StartupConfig>(ctx.Configuration.GetSection("StartupConfig"));
 
 					isc.AddSingleton(isp => new DiscordClient(new DSharpPlus.DiscordConfiguration() {
 						Token = isp.GetRequiredService<IOptions<DiscordConfiguration>>().Value.Token
@@ -53,6 +57,24 @@ namespace IkIheMusicBot {
 
 			var discord = host.Services.GetRequiredService<DiscordClient>();
 			var lavalink = host.Services.GetRequiredService<LavalinkExtension>();
+
+			discord.Ready += (o, eventArgs) => {
+				_ = Task.Run(async () => {
+					StartupConfig startupConfig = host.Services.GetRequiredService<IOptions<StartupConfig>>().Value;
+					if (startupConfig != null) {
+						try {
+							var lavalinkManager = host.Services.GetRequiredService<LavalinkManager>();
+							DiscordGuild guild = await discord.GetGuildAsync(startupConfig.JoinGuild);
+							IReadOnlyList<DiscordChannel> channels = await guild.GetChannelsAsync();
+							IReadOnlyList<LavalinkTrack> tracks = await lavalinkManager.QueueAsync(channels.First(channel => channel.Id == startupConfig.JoinChannel), startupConfig.LoadTrack, LavalinkSearchType.Plain);
+							Console.WriteLine(tracks.Count);
+						} catch (Exception e) {
+							Console.WriteLine("Failed to perform startup actions\n" + e.ToStringDemystified());
+						}
+					}
+				});
+				return Task.CompletedTask;
+			};
 
 			discord.InteractionCreated += (DiscordClient sender, InteractionCreateEventArgs eventArgs) => {
 				if (eventArgs.Interaction.Type == InteractionType.ApplicationCommand && eventArgs.Interaction.ApplicationId == sender.CurrentApplication.Id) {

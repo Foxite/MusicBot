@@ -53,7 +53,7 @@ namespace IkIheMusicBot {
 			} else {
 				searchType = LavalinkSearchType.Youtube;
 			}
-			IReadOnlyList<LavalinkTrack> tracks = await Lavalink.QueueAsync(Context.Guild, ((DiscordMember) Context.User).VoiceState.Channel, search, searchType);
+			IReadOnlyList<LavalinkTrack> tracks = await Lavalink.QueueAsync(((DiscordMember) Context.User).VoiceState.Channel, search, searchType);
 			if (tracks.Count == 0) {
 				return new TextResult(false, "Added zero tracks");
 			} else if (tracks.Count == 1) {

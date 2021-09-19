@@ -22,7 +22,7 @@ namespace IkIheMusicBot.Services {
 			return m_Queues.GetOrAdd(guild, _ => new LavalinkQueue(Lavalink.GetIdealNodeConnection().GetGuildConnection(guild)));
 		}
 
-		public async Task<IReadOnlyList<LavalinkTrack>> QueueAsync(DiscordGuild guild, DiscordChannel channel, string searchOrUri, LavalinkSearchType searchType) {
+		public async Task<IReadOnlyList<LavalinkTrack>> QueueAsync(DiscordChannel channel, string searchOrUri, LavalinkSearchType searchType) {
 			LavalinkQueue queue = m_Queues.GetOrAdd(channel.Guild, _ => {
 				LavalinkNodeConnection lnc = Lavalink.GetIdealNodeConnection();
 				// Would very much like for this line to be moved out of this lambda and properly awaited
@@ -54,12 +54,12 @@ namespace IkIheMusicBot.Services {
 
 			if (result.LoadResultType == LavalinkLoadResultType.PlaylistLoaded) {
 				foreach (LavalinkTrack track in result.Tracks) {
-					await GetLavalinkQueue(guild).AddToQueueAsync(track);
+					await GetLavalinkQueue(channel.Guild).AddToQueueAsync(track);
 				}
 				return result.Tracks.ToList();
 			} else if (result.LoadResultType is LavalinkLoadResultType.SearchResult or LavalinkLoadResultType.TrackLoaded) {
 				LavalinkTrack track = result.Tracks.First();
-				await GetLavalinkQueue(guild).AddToQueueAsync(track);
+				await GetLavalinkQueue(channel.Guild).AddToQueueAsync(track);
 				return new[] { track };
 			} else if (result.LoadResultType is LavalinkLoadResultType.NoMatches) {
 				return Array.Empty<LavalinkTrack>();
