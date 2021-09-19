@@ -33,7 +33,7 @@ namespace IkIheMusicBot.Services {
 			LavalinkGuildConnection gc = queue.GetGuildConnection();
 			
 			LavalinkLoadResult result;
-			if (searchType == LavalinkSearchType.Plain && File.Exists(searchOrUri) && searchOrUri.EndsWith(".m3u")) {
+			if (searchType == LavalinkSearchType.Plain && searchOrUri.StartsWith("/") && searchOrUri.EndsWith(".m3u")) {
 				string[] lines = await File.ReadAllLinesAsync(searchOrUri);
 				var tracks = new List<LavalinkTrack>(lines.Length);
 				foreach (string line_ in lines) {

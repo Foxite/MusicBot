@@ -66,7 +66,7 @@ namespace IkIheMusicBot {
 			if (discordTask != null) {
 				await discordTask;
 			}
-			foreach (DiscordApplicationCommand command in await m_DiscordClient.BulkOverwriteGuildApplicationCommandsAsync(346682476149866497, preCommandMap.Select(kvp => kvp.Value.Item1))) {
+			foreach (DiscordApplicationCommand command in await m_DiscordClient.BulkOverwriteGlobalApplicationCommandsAsync(preCommandMap.Select(kvp => kvp.Value.Item1))) {
 				m_CommandMap[command.Name] = preCommandMap[command.Name].Item2;
 			}
 		}

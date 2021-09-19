@@ -137,10 +137,20 @@ namespace IkIheMusicBot {
 		public CommandResult Queue() {
 			var ret = new StringBuilder();
 			ret.AppendLine($"Queue for {Context.Channel.Name}");
-			foreach (LavalinkTrack track in Lavalink.GetQueue(Context.Guild, 20)) { // TODO pagination
+			var queue = Lavalink.GetQueue(Context.Guild);
+			foreach (LavalinkTrack track in queue.Take(10)) { // TODO pagination
 				ret.AppendLine($"[{track.Identifier}] {track.Title} ({track.Length.ToString()})");
 			}
+			if (queue.Count > 10) {
+				ret.AppendLine("");
+				ret.AppendLine($"+{queue.Count - 10} items");
+			}
 			return new TextResult(true, ret.ToString());
+		}
+
+		[Command("github"), Description("Get a link to the bot's source code")]
+		public CommandResult GithubLink() {
+			return new TextResult(true, "https://github.com/Foxite/MusicBot");
 		}
 	}
 }

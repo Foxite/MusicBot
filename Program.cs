@@ -67,6 +67,7 @@ namespace IkIheMusicBot {
 							DiscordGuild guild = await discord.GetGuildAsync(startupConfig.JoinGuild);
 							IReadOnlyList<DiscordChannel> channels = await guild.GetChannelsAsync();
 							IReadOnlyList<LavalinkTrack> tracks = await lavalinkManager.QueueAsync(channels.First(channel => channel.Id == startupConfig.JoinChannel), startupConfig.LoadTrack, LavalinkSearchType.Plain);
+							lavalinkManager.SetRepeating(guild, startupConfig.Repeat);
 							Console.WriteLine(tracks.Count);
 						} catch (Exception e) {
 							Console.WriteLine("Failed to perform startup actions\n" + e.ToStringDemystified());
@@ -113,17 +114,15 @@ namespace IkIheMusicBot {
 			try {
 				Command command = services.GetRequiredService<CommandManager>().GetCommand(interaction.Data.Name)!;
 				if ((interaction.Data.Options ?? Array.Empty<DiscordInteractionDataOption>()).CountEquals(command.Parameters.Count)) {
+					IEnumerable<object> parameters = (interaction.Data.Options ?? Array.Empty<DiscordInteractionDataOption>()).Select(option => option.Type switch {
+						//ApplicationCommandOptionType.Channel => ctx.Channel.Guild.GetChannel((ulong) option.Value),
+						//ApplicationCommandOptionType.User => discord.GetUserAsync((ulong) option.Value).GetAwaiter().GetResult(), // deadlock?
+						//ApplicationCommandOptionType.Role => ctx.Channel.Guild.GetRole((ulong) option.Value),
+						_ => option.Value
+					});
 					DiscordMember member = await interaction.Guild.GetMemberAsync(interaction.User.Id);
 					var ctx = new DiscordCommandContext(services, interaction, member);
-					IResult result = await command.ExecuteAsync(
-						(interaction.Data.Options ?? Array.Empty<DiscordInteractionDataOption>()).Select(option => option.Type switch {
-							//ApplicationCommandOptionType.Channel => ctx.Channel.Guild.GetChannel((ulong) option.Value),
-							//ApplicationCommandOptionType.User => discord.GetUserAsync((ulong) option.Value).GetAwaiter().GetResult(), // deadlock?
-							//ApplicationCommandOptionType.Role => ctx.Channel.Guild.GetRole((ulong) option.Value),
-							_ => option.Value
-						}),
-						ctx
-					);
+					IResult result = await command.ExecuteAsync(parameters, ctx);
 					if (result is CommandExecutionFailedResult cefr) {
 						Console.WriteLine(cefr.Exception.ToStringDemystified());
 						await interaction.CreateFollowupMessageAsync(new DiscordFollowupMessageBuilder() {
