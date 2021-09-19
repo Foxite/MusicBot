@@ -1,12 +1,10 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
+using System.IO;
 using System.Text;
 using System.Threading.Tasks;
-using DSharpPlus;
 using DSharpPlus.Entities;
 using DSharpPlus.Lavalink;
-using DSharpPlus.Net;
 using IkIheMusicBot.Services;
 using Qmmands;
 
@@ -19,58 +17,106 @@ namespace IkIheMusicBot {
 		// 	return Lavalink.LeaveAsync(Context.Guild);
 		// }
 
+		// TODO move to util class
+		private static async Task<bool> LocalFileExistsAndCanRead(string path) {
+			try {
+				await File.OpenRead(path).DisposeAsync();
+				return true;
+			} catch (Exception) {
+				return false;
+			}
+		}
+
 		[Command("play"), Description("Play something")]
-		public async Task<CommandResult> Play([Description("Search query or URL")] string search, [Description("search in category")] LavalinkSearchType searchType = LavalinkSearchType.Youtube) {
-			IReadOnlyList<LavalinkTrack> tracks = await Lavalink.QueueAsync(Context.Guild, ((DiscordMember) Context.User).VoiceState.Channel, search);
+		public async Task<CommandResult> Play([Description("Search query or URL")] string search) {
+			LavalinkSearchType searchType;
+			if (Uri.TryCreate(search, UriKind.Absolute, out _) || await LocalFileExistsAndCanRead(search)) {
+				searchType = LavalinkSearchType.Plain;
+			} else {
+				searchType = LavalinkSearchType.Youtube;
+			}
+			IReadOnlyList<LavalinkTrack> tracks = await Lavalink.QueueAsync(Context.Guild, ((DiscordMember) Context.User).VoiceState.Channel, search, searchType);
 			if (tracks.Count == 0) {
 				return new TextResult(false, "Added zero tracks");
+			} else if (tracks.Count == 1) {
+				return new TextResult(true, $"Added {tracks[0].Title} ({tracks[0].Length.ToString()})");
 			} else {
 				return new TextResult(true, $"Added {tracks.Count} track{(tracks.Count == 1 ? "" : "s")}");
 			}
 		}
 
 		[Command("resume"), Description("Resume playback")]
-		public Task Resume() {
-			return Lavalink.ResumeAsync(Context.Guild);
+		public async Task<CommandResult> Resume() {
+			LavalinkTrack? result = await Lavalink.ResumeAsync(Context.Guild);
+			if (result != null) {
+				return new TextResult(true, "Resumed " + result.Title);
+			} else {
+				DiscordChannel? channel = Lavalink.GetVoiceChannel(Context.Guild);
+				if (channel != null) {
+					return new TextResult(true, "Nothing is playing in " + channel.Name);
+				} else {
+					return new TextResult(false, "Nothing is playing in " + Context.Guild.Name);
+				}
+			}
 		}
 
-		[Command("stop", "pause"), Description("Stop playing")]
-		public Task Stop() {
+		[Command("pause"), Description("Pause playback")]
+		public Task Pause() {
 			return Lavalink.PauseAsync(Context.Guild);
 		}
 		
 		[Command("skip", "next"), Description("Skip this song")]
-		public Task Skip() {
-			return Lavalink.SkipAsync(Context.Guild);
+		public async Task<CommandResult> Skip() {
+			LavalinkTrack? skippedTrack = await Lavalink.SkipAsync(Context.Guild);
+			if (skippedTrack == null) {
+				return new TextResult(false, "Did not skip any tracks");
+			} else {
+				return new TextResult(true, "Skipped " + skippedTrack.Title);
+			}
 		}
 
 		[Command("repeat"), Description("Toggle repeating")]
-		public void ToggleRepeat() {
-			Lavalink.SetRepeating(Context.Guild, Lavalink.GetRepeating(Context.Guild));
+		public CommandResult ToggleRepeat() {
+			bool? repeating = Lavalink.GetRepeating(Context.Guild);
+			if (repeating.HasValue) {
+				Lavalink.SetRepeating(Context.Guild, !repeating.Value);
+				return new TextResult(true, $"Now {(!repeating.Value ? "" : "not ")}repeating in {Lavalink.GetVoiceChannel(Context.Guild)!.Name}");
+			} else {
+				return new TextResult(false, "Nothing is playing in " + Context.Guild.Name);
+			}
 		}
 
 		[Command("np", "nowplaying", "now"), Description("See the current song")]
 		public CommandResult NowPlaying() {
-			LavalinkTrack track = Lavalink.GetNowPlaying(Context.Guild);
-			IReadOnlyList<LavalinkTrack> queue = Lavalink.GetQueue(Context.Guild);
-			return new EmbedResult(embedBuilder => {
-				embedBuilder.Title = track.Title;
-				embedBuilder.Url = track.Uri.ToString();
-				embedBuilder.Description = $"{track.Position.ToString()} / {track.Length.ToString()}";
-				if (queue.Count >= 1) {
-					embedBuilder.AddField("Up next", queue[0].Title, true);
+			IReadOnlyList<LavalinkTrack> queue = Lavalink.GetQueue(Context.Guild, 3);
+			if (queue.Count == 0) {
+				DiscordChannel? channel = Lavalink.GetVoiceChannel(Context.Guild);
+				if (channel != null) {
+					return new TextResult(true, "Nothing is playing in " + channel.Name);
+				} else {
+					return new TextResult(false, "Nothing is playing in " + Context.Guild.Name);
 				}
-				if (queue.Count >= 2) {
-					embedBuilder.AddField("After that", queue[1].Title, true);
-				}
-			});
+			} else {
+				LavalinkTrack track = queue[0];
+				return new EmbedResult(embedBuilder => {
+					embedBuilder.Title = track.Title;
+					embedBuilder.Url = track.Uri.ToString();
+					embedBuilder.Description = $"{track.Position.ToString()} / {track.Length.ToString()}";
+					if (queue.Count >= 2) {
+						embedBuilder.AddField("Up next", queue[1].Title, true);
+					}
+					if (queue.Count >= 3) {
+						embedBuilder.AddField("After that", queue[2].Title, true);
+					}
+				});
+			}
 		}
 
 		[Command("queue"), Description("See the queue")]
 		public CommandResult Queue() {
 			var ret = new StringBuilder();
 			ret.AppendLine($"Queue for {Context.Channel.Name}");
-			foreach (LavalinkTrack track in Lavalink.GetQueue(Context.Guild).Take(20)) { // TODO pagination
+			foreach (LavalinkTrack track in Lavalink.GetQueue(Context.Guild, 20)) { // TODO pagination
 				ret.AppendLine($"[{track.Identifier}] {track.Title} ({track.Length.ToString()})");
 			}
 			return new TextResult(true, ret.ToString());
