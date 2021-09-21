@@ -135,5 +135,19 @@ namespace IkIheMusicBot.Services {
 		}
 
 		public LavalinkGuildConnection GetGuildConnection() => m_GuildConnection;
+
+		public void SaveQueue(QueueDbContext dbContext) {
+			lock (m_Queue) {
+				dbContext.GuildQueues.Add(new GuildQueue() {
+					DiscordGuildId = m_GuildConnection.Guild.Id,
+					DiscordChannelId = m_GuildConnection.Channel.Id,
+					Repeating = Repeat,
+					Tracks = m_Queue.Select(track => new GuildQueueTrack() {
+						TrackUri = track.Uri,
+						Position = track.Position
+					}).ToList()
+				});
+			}
+		}
 	}
 }

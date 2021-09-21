@@ -1,13 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Diagnostics.Contracts;
 using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
-using Discord;
+using AngleSharp.Common;
 using DSharpPlus;
 using DSharpPlus.Entities;
 using DSharpPlus.EventArgs;
@@ -15,14 +14,16 @@ using DSharpPlus.Lavalink;
 using DSharpPlus.Net;
 using Foxite.Common.Notifications;
 using IkIheMusicBot.Services;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Qmmands;
 
 namespace IkIheMusicBot {
-	public static class Program {
+	public sealed class Program {
 		private static async Task Main(string[] args) {
 			IHost host = Host.CreateDefaultBuilder()
 				.UseConsoleLifetime()
@@ -38,7 +39,8 @@ namespace IkIheMusicBot {
 					isc.Configure<DjRoleConfig>(ctx.Configuration.GetSection("DjRoleConfig"));
 					isc.Configure<LocalMediaConfig>(ctx.Configuration.GetSection("LocalMediaConfig"));
 					isc.Configure<LavalinkConfig>(ctx.Configuration.GetSection("LavalinkConfig"));
-					isc.Configure<StartupConfig>(ctx.Configuration.GetSection("StartupConfig"));
+
+					isc.AddDbContext<QueueDbContext>(GetEntityFrameworkConfigurator(ctx.Configuration.GetSection("Database")));
 
 					isc.AddSingleton(isp => new DiscordClient(new DSharpPlus.DiscordConfiguration() {
 						Token = isp.GetRequiredService<IOptions<DiscordConfiguration>>().Value.Token
@@ -60,21 +62,7 @@ namespace IkIheMusicBot {
 			var lavalink = host.Services.GetRequiredService<LavalinkExtension>();
 
 			discord.Ready += (o, eventArgs) => {
-				_ = Task.Run(async () => {
-					StartupConfig startupConfig = host.Services.GetRequiredService<IOptions<StartupConfig>>().Value;
-					if (startupConfig != null && startupConfig.JoinGuild != default) {
-						try {
-							var lavalinkManager = host.Services.GetRequiredService<LavalinkManager>();
-							DiscordGuild guild = await discord.GetGuildAsync(startupConfig.JoinGuild);
-							IReadOnlyList<DiscordChannel> channels = await guild.GetChannelsAsync();
-							IReadOnlyList<LavalinkTrack> tracks = await lavalinkManager.QueueAsync(channels.First(channel => channel.Id == startupConfig.JoinChannel), startupConfig.LoadTrack, LavalinkSearchType.Plain);
-							lavalinkManager.SetRepeating(guild, startupConfig.Repeat);
-							Console.WriteLine(tracks.Count);
-						} catch (Exception e) {
-							Console.WriteLine("Failed to perform startup actions\n" + e.ToStringDemystified());
-						}
-					}
-				});
+				_ = Task.Run(() => RestartQueuesAsync(host));
 				return Task.CompletedTask;
 			};
 
@@ -110,6 +98,67 @@ namespace IkIheMusicBot {
 			await host.RunAsync();
 		}
 
+		private static async Task RestartQueuesAsync(IHost host) {
+			var dbContext = host.Services.GetRequiredService<QueueDbContext>();
+			var logger = host.Services.GetRequiredService<ILogger<Program>>();
+			var discord = host.Services.GetRequiredService<DiscordClient>();
+
+			Exception? firstException = null;
+			int failCount = 0;
+			foreach (var savedQueue in dbContext.GuildQueues) {
+				try {
+					var lavalinkManager = host.Services.GetRequiredService<LavalinkManager>();
+					DiscordGuild guild = await discord.GetGuildAsync(savedQueue.DiscordGuildId);
+					IReadOnlyList<DiscordChannel> channels = await guild.GetChannelsAsync();
+					foreach (GuildQueueTrack savedTrack in savedQueue.Tracks) {
+						await lavalinkManager.QueueAsync(channels.First(channel => channel.Id == savedQueue.DiscordChannelId), savedTrack.TrackUri.ToString(), LavalinkSearchType.Plain);
+					}
+					lavalinkManager.SetRepeating(guild, savedQueue.Repeating);
+				} catch (Exception e) {
+					logger.LogError(e, "Failed to restore saved queue for guild {0}", savedQueue.DiscordGuildId);
+					failCount++;
+					firstException ??= e;
+				}
+			}
+
+			if (firstException != null) {
+				try {
+					await host.Services.GetRequiredService<NotificationService>().SendNotificationAsync($"Failed to restore saved queues for {failCount} guilds. First exception: {firstException.ToStringDemystified()}");
+				} catch (Exception e) {
+					logger.LogCritical(e, "Could not send error notification for failed restores");
+				}
+			}
+		}
+
+		public static Action<DbContextOptionsBuilder> GetEntityFrameworkConfigurator(IConfiguration config) {
+			return dbOptions => ConfigureEntityFramework(dbOptions, config.Get<PostgresConfig>());
+		}
+		
+		public static void ConfigureEntityFramework(DbContextOptionsBuilder dbOptions, PostgresConfig config) {
+			var configDict = new Dictionary<string, object> {
+				["Host"] = config.Host,
+				["Port"] = config.Port,
+				["Database"] = config.Database,
+				["Username"] = config.Username,
+				["Password"] = config.Password
+			};
+
+			if (config.Encrypt is EncryptMode.Standard or EncryptMode.Trust) {
+				configDict["SSL Mode"] = "Require";
+				if (config.Encrypt == EncryptMode.Trust) {
+					configDict["Trust Server Certificate"] = true;
+				}
+			} else {
+				configDict["SSL Mode"] = "Prefer";
+			}
+			
+			string connectionString = string.Join("; ", configDict.Select(kvp => $"{kvp.Key}={kvp.Value}"));
+			
+			dbOptions.UseNpgsql(connectionString, npgsqlOptions => {
+				npgsqlOptions.MigrationsAssembly(Assembly.GetExecutingAssembly().GetName().Name);
+			});
+		}
+
 		private static async Task HandleCommandAsync(IServiceProvider services, DiscordInteraction interaction) {
 			await interaction.CreateResponseAsync(InteractionResponseType.DeferredChannelMessageWithSource);
 			try {
@@ -134,7 +183,7 @@ namespace IkIheMusicBot {
 						var response = new StringBuilder("One or more checks have failed: ");
 						if (cfr.FailedChecks.Count > 1) {
 							response.AppendLine();
-							foreach ((Qmmands.CheckAttribute check, CheckResult checkResult) in cfr.FailedChecks.Where(tuple => !tuple.Result.IsSuccessful)) {
+							foreach ((Qmmands.CheckAttribute _, CheckResult checkResult) in cfr.FailedChecks.Where(tuple => !tuple.Result.IsSuccessful)) {
 								response.AppendLine($"- {checkResult.FailureReason}");
 							}
 						} else {
@@ -143,7 +192,7 @@ namespace IkIheMusicBot {
 						await interaction.CreateFollowupMessageAsync(new DiscordFollowupMessageBuilder() {
 							Content = response.ToString(),
 						}); 
-					} else if (result is SuccessfulResult sr) {
+					} else if (result is SuccessfulResult _) {
 						await interaction.CreateFollowupMessageAsync(new DiscordFollowupMessageBuilder() {
 							Content = "No result (successful)"
 						});
@@ -152,7 +201,7 @@ namespace IkIheMusicBot {
 						await cr.HandleAsync(ctx, messageBuilder);
 						await interaction.CreateFollowupMessageAsync(messageBuilder);
 					} else {
-						throw new Exception("Invalid result type " + result?.GetType()?.FullName ?? "null");
+						throw new Exception("Invalid result type " + ((result?.GetType())?.FullName ?? "null"));
 					}
 				} else {
 					await interaction.CreateFollowupMessageAsync(new DiscordFollowupMessageBuilder() {

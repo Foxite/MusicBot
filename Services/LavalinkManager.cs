@@ -9,11 +9,14 @@ using DSharpPlus.Entities;
 using DSharpPlus.Lavalink;
 
 namespace IkIheMusicBot.Services {
-	public class LavalinkManager {
-		public LavalinkExtension Lavalink { get; }
+	public class LavalinkManager : IAsyncDisposable {
+		private readonly Func<QueueDbContext> m_QueueDbContextFactory;
 		private readonly ConcurrentDictionary<DiscordGuild, LavalinkQueue> m_Queues;
+		
+		public LavalinkExtension Lavalink { get; }
 
-		public LavalinkManager(LavalinkExtension lavalink) {
+		public LavalinkManager(LavalinkExtension lavalink, Func<QueueDbContext> queueDbContextFactory) {
+			m_QueueDbContextFactory = queueDbContextFactory;
 			Lavalink = lavalink;
 			m_Queues = new ConcurrentDictionary<DiscordGuild, LavalinkQueue>();
 		}
@@ -134,6 +137,14 @@ namespace IkIheMusicBot.Services {
 			} else {
 				return null;
 			}
+		}
+		
+		public async ValueTask DisposeAsync() {
+			QueueDbContext dbContext = m_QueueDbContextFactory();
+			foreach (var queue in m_Queues.Values) {
+				queue.SaveQueue(dbContext);
+			}
+			await dbContext.SaveChangesAsync();
 		}
 	}
 }

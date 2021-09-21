@@ -40,5 +40,13 @@
         "AllowedPathPrefixes": [
             
         ]
+    },
+    "Database": {
+        "Host": "",
+        "Port": 5432,
+        "Database": "musicbot-data",
+        "Username": "musicbot",
+        "Password": "",
+        "Encrypt": "Standard"
     }
 }
