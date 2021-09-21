@@ -13,6 +13,7 @@ using DSharpPlus.Entities;
 using DSharpPlus.EventArgs;
 using DSharpPlus.Lavalink;
 using DSharpPlus.Net;
+using Foxite.Common.Notifications;
 using IkIheMusicBot.Services;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -61,7 +62,7 @@ namespace IkIheMusicBot {
 			discord.Ready += (o, eventArgs) => {
 				_ = Task.Run(async () => {
 					StartupConfig startupConfig = host.Services.GetRequiredService<IOptions<StartupConfig>>().Value;
-					if (startupConfig != null) {
+					if (startupConfig != null && startupConfig.JoinGuild != default) {
 						try {
 							var lavalinkManager = host.Services.GetRequiredService<LavalinkManager>();
 							DiscordGuild guild = await discord.GetGuildAsync(startupConfig.JoinGuild);
@@ -128,6 +129,7 @@ namespace IkIheMusicBot {
 						await interaction.CreateFollowupMessageAsync(new DiscordFollowupMessageBuilder() {
 							Content = "There was a unhandled error while executing the command.",
 						});
+						await services.GetRequiredService<NotificationService>().SendNotificationAsync(cefr.Exception.ToStringDemystified());
 					} else if (result is ChecksFailedResult cfr) {
 						var response = new StringBuilder("One or more checks have failed: ");
 						if (cfr.FailedChecks.Count > 1) {
@@ -158,10 +160,11 @@ namespace IkIheMusicBot {
 					});
 				}
 			} catch (Exception e) {
+				Console.WriteLine(e.ToStringDemystified());
 				await interaction.CreateFollowupMessageAsync(new DiscordFollowupMessageBuilder() {
 					Content = "There was a serious unhandled error while executing the command.",
 				});
-				Console.WriteLine(e.ToStringDemystified());
+				await services.GetRequiredService<NotificationService>().SendNotificationAsync(e.ToStringDemystified());
 			}
 		}
 	}
