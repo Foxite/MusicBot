@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using DSharpPlus.Lavalink;
@@ -51,6 +52,11 @@ namespace IkIheMusicBot.Services {
 		public Task AddToQueueAsync(LavalinkTrack track) {
 			lock (m_QueueLock) {
 				bool playImmediately = m_Queue.Count == 0 && m_GuildConnection.CurrentState.CurrentTrack == null;
+
+				if (track.Title == "Unknown title" && !track.Uri.IsAbsoluteUri) {
+					track.GetType().GetProperty(nameof(track.Title))!.SetValue(track, Path.GetFileNameWithoutExtension(track.Uri.ToString()));
+				}
+				
 				m_Queue.AddLast(track);
 				if (playImmediately) {
 					return NextSongAsync();
