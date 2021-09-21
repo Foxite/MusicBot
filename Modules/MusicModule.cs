@@ -121,7 +121,11 @@ namespace IkIheMusicBot {
 				LavalinkTrack track = queue[0];
 				return new EmbedResult(embedBuilder => {
 					embedBuilder.Title = track.Title;
-					embedBuilder.Url = track.Uri.ToString();
+
+					if (track.Uri.IsAbsoluteUri) {
+						embedBuilder.Url = track.Uri.ToString();
+					}
+					
 					embedBuilder.Description = $"{track.Position.ToString()} / {track.Length.ToString()}";
 					if (queue.Count >= 2) {
 						embedBuilder.AddField("Up next", queue[1].Title, true);
