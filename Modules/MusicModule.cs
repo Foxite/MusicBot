@@ -8,6 +8,7 @@ using DSharpPlus.Entities;
 using DSharpPlus.Lavalink;
 using IkIheMusicBot.Services;
 using Microsoft.Extensions.Options;
+using Org.BouncyCastle.Crypto.Tls;
 using Qmmands;
 
 namespace IkIheMusicBot {
@@ -57,7 +58,7 @@ namespace IkIheMusicBot {
 			if (tracks.Count == 0) {
 				return new TextResult(false, "Added zero tracks");
 			} else if (tracks.Count == 1) {
-				return new TextResult(true, $"Added {tracks[0].Title} ({tracks[0].Length.ToString()})");
+				return new TextResult(true, $"Added {tracks[0].Title} ({tracks[0].Length.ToStringSimple()})");
 			} else {
 				return new TextResult(true, $"Added {tracks.Count} track{(tracks.Count == 1 ? "" : "s")}");
 			}
@@ -126,7 +127,7 @@ namespace IkIheMusicBot {
 						embedBuilder.Url = track.Uri.ToString();
 					}
 					
-					embedBuilder.Description = $"{track.Position.ToString()} / {track.Length.ToString()}";
+					embedBuilder.Description = $"{track.Position.ToStringSimple()} / {track.Length.ToStringSimple()}";
 					if (queue.Count >= 2) {
 						embedBuilder.AddField("Up next", queue[1].Title, true);
 					}
@@ -143,7 +144,7 @@ namespace IkIheMusicBot {
 			ret.AppendLine($"Queue for {Context.Channel.Name}");
 			var queue = Lavalink.GetQueue(Context.Guild);
 			foreach (LavalinkTrack track in queue.Take(10)) { // TODO pagination
-				ret.AppendLine($"[{track.Identifier}] {track.Title} ({track.Length.ToString()})");
+				ret.AppendLine($"[{track.Identifier}] {track.Title} ({track.Length.ToStringSimple()})");
 			}
 			if (queue.Count > 10) {
 				ret.AppendLine("");
@@ -155,6 +156,18 @@ namespace IkIheMusicBot {
 		[Command("github"), Description("Get a link to the bot's source code")]
 		public CommandResult GithubLink() {
 			return new TextResult(true, "https://github.com/Foxite/MusicBot");
+		}
+	}
+
+	public static class TimespanUtil {
+		public static string ToStringSimple(this TimeSpan ts) {
+			string ret = "";
+			if (ts.TotalHours >= 1) {
+				ret += ((int) ts.TotalHours) + ":";
+			}
+			var formatSpecifier = new string('0', ts.TotalHours >= 1 ? 2 : 1);
+			ret += $"{ts.Minutes.ToString(formatSpecifier)}:{ts.Seconds:00}";
+			return ret;
 		}
 	}
 }
