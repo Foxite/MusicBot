@@ -11,8 +11,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
-    - name: Set env
-      run: echo "DATETIME=$(date --utc --rfc-3339=seconds | cut -c 1-19 | sed 's/[ :]/-/g')" >> $GITHUB_ENV
     - name: Publish Docker
       uses: elgohr/Publish-Docker-Github-Action@3.04
       with:
@@ -21,4 +19,3 @@ jobs:
         username: ${{ secrets.DEPLOY_USERNAME }}
         password: ${{ secrets.DEPLOY_PASSWD }}
         default_branch: master
-        tags: "latest,${{ env.DATETIME }}"
