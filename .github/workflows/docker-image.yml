@@ -16,6 +16,6 @@ jobs:
       with:
         name: ik_ihe-music
         registry: ${{ secrets.DEPLOY_REPO }}
-        username: ${{ secrets.DEPLOY_USER }}
+        username: ${{ secrets.DEPLOY_USERNAME }}
         password: ${{ secrets.DEPLOY_PASSWD }}
         default_branch: master
