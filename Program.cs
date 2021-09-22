@@ -23,7 +23,7 @@ using Qmmands;
 
 namespace IkIheMusicBot {
 	public sealed class Program {
-		public static string ProgramVersion => "0.1.17";
+		public static string ProgramVersion => "0.1.18";
 	
 		private static async Task Main(string[] args) {
 			IHost host = Host.CreateDefaultBuilder()
