@@ -1,8 +1,7 @@
-using DSharpPlus.Lavalink;
 using Qmmands;
 
 namespace IkIheMusicBot {
-	public class MetaModule {
+	public class MetaModule : ModuleBase<DiscordCommandContext> {
 		[Command("github"), Description("Get a link to the bot's source code")]
 		public CommandResult GithubLink() {
 			return new TextResult(true, "https://github.com/Foxite/MusicBot");
