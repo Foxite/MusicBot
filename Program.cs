@@ -22,7 +22,9 @@ using Microsoft.Extensions.Options;
 using Qmmands;
 
 namespace IkIheMusicBot {
-	public static class Program {
+	public sealed class Program {
+		public static string ProgramVersion => "0.1.11";
+	
 		private static async Task Main(string[] args) {
 			IHost host = Host.CreateDefaultBuilder()
 				.UseConsoleLifetime()

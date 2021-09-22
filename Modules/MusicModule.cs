@@ -152,11 +152,6 @@ namespace IkIheMusicBot {
 			}
 			return new TextResult(true, ret.ToString());
 		}
-
-		[Command("github"), Description("Get a link to the bot's source code")]
-		public CommandResult GithubLink() {
-			return new TextResult(true, "https://github.com/Foxite/MusicBot");
-		}
 	}
 
 	public static class TimespanUtil {
