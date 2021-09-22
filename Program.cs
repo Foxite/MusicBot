@@ -23,7 +23,7 @@ using Qmmands;
 
 namespace IkIheMusicBot {
 	public sealed class Program {
-		public static string ProgramVersion => "0.1.11";
+		public static string ProgramVersion => "0.1.12";
 	
 		private static async Task Main(string[] args) {
 			IHost host = Host.CreateDefaultBuilder()
@@ -115,8 +115,10 @@ namespace IkIheMusicBot {
 		private static async Task HandleCommandAsync(IServiceProvider services, DiscordInteraction interaction) {
 			await interaction.CreateResponseAsync(InteractionResponseType.DeferredChannelMessageWithSource);
 			try {
-				Command command = services.GetRequiredService<CommandManager>().GetCommand(interaction.Data.Name)!;
-				if ((interaction.Data.Options ?? Array.Empty<DiscordInteractionDataOption>()).CountEquals(command.Parameters.Count)) {
+				int optionCount = (interaction.Data.Options ?? Array.Empty<DiscordInteractionDataOption>()).Count();
+				Command? command = services.GetRequiredService<CommandService>().FindCommands(interaction.Data.Name)
+					.FirstOrDefault(commandMatch => optionCount == commandMatch.Command.Parameters.Count)?.Command;
+				if (command != null) {
 					IEnumerable<object> parameters = (interaction.Data.Options ?? Array.Empty<DiscordInteractionDataOption>()).Select(option => option.Type switch {
 						//ApplicationCommandOptionType.Channel => ctx.Channel.Guild.GetChannel((ulong) option.Value),
 						//ApplicationCommandOptionType.User => discord.GetUserAsync((ulong) option.Value).GetAwaiter().GetResult(), // deadlock?

@@ -4,19 +4,22 @@ using System.Linq;
 using System.Threading.Tasks;
 using DSharpPlus;
 using DSharpPlus.Entities;
+using Microsoft.Extensions.Options;
 using Qmmands;
 
 namespace IkIheMusicBot {
 	public class CommandManager {
 		private readonly CommandService m_CommandService;
 		private readonly DiscordClient m_DiscordClient;
+		private readonly DiscordConfiguration m_DiscordConfig;
 		private readonly Dictionary<string, Command> m_CommandMap;
 
 		public event Action<CommandManager, CommandService, DiscordClient>? Loading;
 
-		public CommandManager(CommandService commandService, DiscordClient discordClient) {
+		public CommandManager(CommandService commandService, DiscordClient discordClient, IOptions<DiscordConfiguration> discordConfig) {
 			m_CommandService = commandService;
 			m_DiscordClient = discordClient;
+			m_DiscordConfig = discordConfig.Value;
 			m_CommandMap = new Dictionary<string, Command>();
 		}
 		
@@ -66,14 +69,12 @@ namespace IkIheMusicBot {
 			if (discordTask != null) {
 				await discordTask;
 			}
-			foreach (DiscordApplicationCommand command in await m_DiscordClient.BulkOverwriteGlobalApplicationCommandsAsync(preCommandMap.Select(kvp => kvp.Value.Item1))) {
-				m_CommandMap[command.Name] = preCommandMap[command.Name].Item2;
+			foreach (ulong guildId in m_DiscordConfig.SlashCommandGuilds) {
+				await m_DiscordClient.BulkOverwriteGuildApplicationCommandsAsync(guildId, preCommandMap.Select(kvp => kvp.Value.Item1));
 			}
-		}
-		
-		public Command? GetCommand(string name) {
-			bool result = m_CommandMap.TryGetValue(name, out Command? command);
-			return command;
+			foreach (DiscordApplicationCommand dac in await m_DiscordClient.GetGlobalApplicationCommandsAsync()) {
+				await m_DiscordClient.DeleteGlobalApplicationCommandAsync(dac.Id);
+			}
 		}
 	}
 }
