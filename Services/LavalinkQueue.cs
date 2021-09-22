@@ -6,9 +6,13 @@ using System.Linq;
 using System.Threading.Tasks;
 using DSharpPlus.Lavalink;
 using DSharpPlus.Lavalink.EventArgs;
+using Foxite.Common.Notifications;
+using Microsoft.Extensions.Logging;
 
 namespace IkIheMusicBot.Services {
 	public class LavalinkQueue {
+		private readonly NotificationService m_Notifications;
+		private readonly ILogger<LavalinkQueue> m_Logger;
 		private readonly LavalinkGuildConnection m_GuildConnection;
 		private readonly LinkedList<LavalinkTrack> m_Queue;
 		private readonly object m_QueueLock;
@@ -23,10 +27,25 @@ namespace IkIheMusicBot.Services {
 			}
 		}
 
-		public LavalinkQueue(LavalinkGuildConnection guildConnection) {
+		public LavalinkQueue(LavalinkGuildConnection guildConnection, NotificationService notifications, ILogger<LavalinkQueue> logger) {
 			m_GuildConnection = guildConnection;
+			m_Notifications = notifications;
+			m_Logger = logger;
 			m_Queue = new LinkedList<LavalinkTrack>();
 			m_QueueLock = new object();
+
+			m_GuildConnection.TrackException += (_, e) => {
+				m_Logger.LogError("TrackException event: guild id: {0}; error: {1}", m_GuildConnection.Guild.Id, e.Error);
+				return m_Notifications.SendNotificationAsync($"TrackException event: guild id: {m_GuildConnection.Guild.Id}; error: {e.Error}");
+			};
+
+			m_GuildConnection.TrackStuck += (_, e) => {
+				m_Logger.LogError("TrackStuck event: guild id: {0}; threshold: {1}", m_GuildConnection.Guild.Id, e.ThresholdMilliseconds);
+				return m_Notifications.SendNotificationAsync($"TrackException event: guild id: {m_GuildConnection.Guild.Id}; threshold: {e.ThresholdMilliseconds}");
+			};
+
+			// This seems to happen pretty often and is not a cause for concern, the library fixes it automatically
+			//m_GuildConnection.DiscordWebSocketClosed += (_, e) => { };
 
 			m_GuildConnection.PlaybackFinished += (_, e) => {
 				try {
@@ -38,13 +57,19 @@ namespace IkIheMusicBot.Services {
 								}
 								m_Queue.RemoveFirst();
 								return NextSongAsync();
+							} else {
+								m_Queue.RemoveFirst();
+								return Task.CompletedTask;
 							}
 						}
+					} else {
+						m_Logger.LogError("Failed to proceed to next track in guild id {0}; track end reason is {1}", m_GuildConnection.Guild.Id, e.Reason);
+						return m_Notifications.SendNotificationAsync($"Failed to proceed to next track; track end reason is {e.Reason}");
 					}
-					return Task.CompletedTask;
 				} catch (Exception exception) {
-					Console.WriteLine("Failed to proceed to next track: " + exception.ToStringDemystified());
-					throw;
+					m_Logger.LogError(exception, "Failed to proceed to next track in guild id {0}", m_GuildConnection.Guild.Id);
+					return m_Notifications.SendNotificationAsync($"Failed to proceed to next track: guild id: {m_GuildConnection.Guild.Id}; exception: {exception.ToStringDemystified()}");
+					//throw;
 				}
 			};
 		}

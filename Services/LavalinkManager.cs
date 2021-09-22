@@ -7,27 +7,30 @@ using System.Threading.Tasks;
 using AngleSharp.Dom;
 using DSharpPlus.Entities;
 using DSharpPlus.Lavalink;
+using Foxite.Common.Notifications;
+using Microsoft.Extensions.Logging;
 
 namespace IkIheMusicBot.Services {
 	public class LavalinkManager {
+		private readonly ILoggerFactory m_LoggerFactory;
+		private readonly NotificationService m_Notifications;
 		public LavalinkExtension Lavalink { get; }
 		private readonly ConcurrentDictionary<DiscordGuild, LavalinkQueue> m_Queues;
 
-		public LavalinkManager(LavalinkExtension lavalink) {
+		public LavalinkManager(LavalinkExtension lavalink, ILoggerFactory loggerFactory, NotificationService notifications) {
+			m_LoggerFactory = loggerFactory;
+			m_Notifications = notifications;
 			Lavalink = lavalink;
 			m_Queues = new ConcurrentDictionary<DiscordGuild, LavalinkQueue>();
-		}
-
-		private LavalinkQueue GetLavalinkQueue(DiscordGuild guild) {
-			return m_Queues.GetOrAdd(guild, _ => new LavalinkQueue(Lavalink.GetIdealNodeConnection().GetGuildConnection(guild)));
 		}
 
 		public async Task<IReadOnlyList<LavalinkTrack>> QueueAsync(DiscordChannel channel, string searchOrUri, LavalinkSearchType searchType) {
 			LavalinkQueue queue = m_Queues.GetOrAdd(channel.Guild, _ => {
 				LavalinkNodeConnection lnc = Lavalink.GetIdealNodeConnection();
-				// Would very much like for this line to be moved out of this lambda and properly awaited
+				// 2021-09-20 Would very much like for this line to be moved out of this lambda and properly awaited
+				// 2021-09-22 I forgot what prevents me from doing so, but I don't have time to figure it out right now TODO move it out
 				LavalinkGuildConnection gc = lnc.ConnectAsync(channel).GetAwaiter().GetResult();
-				return new LavalinkQueue(gc);
+				return new LavalinkQueue(gc, m_Notifications, m_LoggerFactory.CreateLogger<LavalinkQueue>());
 			});
 			
 			LavalinkGuildConnection gc = queue.GetGuildConnection();
@@ -54,12 +57,12 @@ namespace IkIheMusicBot.Services {
 
 			if (result.LoadResultType == LavalinkLoadResultType.PlaylistLoaded) {
 				foreach (LavalinkTrack track in result.Tracks) {
-					await GetLavalinkQueue(channel.Guild).AddToQueueAsync(track);
+					await queue.AddToQueueAsync(track);
 				}
 				return result.Tracks.ToList();
 			} else if (result.LoadResultType is LavalinkLoadResultType.SearchResult or LavalinkLoadResultType.TrackLoaded) {
 				LavalinkTrack track = result.Tracks.First();
-				await GetLavalinkQueue(channel.Guild).AddToQueueAsync(track);
+				await queue.AddToQueueAsync(track);
 				return new[] { track };
 			} else if (result.LoadResultType is LavalinkLoadResultType.NoMatches) {
 				return Array.Empty<LavalinkTrack>();
