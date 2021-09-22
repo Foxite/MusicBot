@@ -13,9 +13,9 @@ jobs:
     - uses: actions/checkout@v2
     - name: Publish Docker
       uses: elgohr/Publish-Docker-Github-Action@3.04
-      with: 
+      with:
         name: ik_ihe-music
-        registry: $({ secrets.DEPLOY_REPO })
-        username: $({ secrets.DEPLOY_USER })
-        password: $({ secrets.DEPLOY_PASSWD })
+        registry: ${{ secrets.DEPLOY_REPO }}
+        username: ${{ secrets.DEPLOY_USER }}
+        password: ${{ secrets.DEPLOY_PASSWD }}
         default_branch: master
