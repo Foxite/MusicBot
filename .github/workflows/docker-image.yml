@@ -19,3 +19,4 @@ jobs:
         username: ${{ secrets.DEPLOY_USERNAME }}
         password: ${{ secrets.DEPLOY_PASSWD }}
         default_branch: master
+        tag_semver: true
