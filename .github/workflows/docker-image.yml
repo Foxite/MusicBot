@@ -11,5 +11,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
-    - name: Build the Docker image
-      run: docker build . --file Dockerfile --tag my-image-name:$(date +%s)
+    - name: Publish Docker
+      uses: elgohr/Publish-Docker-Github-Action@3.04
+      with: 
+        name: ik_ihe-music
+        registry: $({ secrets.DEPLOY_REPO })
+        username: $({ secrets.DEPLOY_USER })
+        password: $({ secrets.DEPLOY_PASSWD })
+        default_branch: master
