@@ -11,6 +11,7 @@ using Foxite.Common;
 using Microsoft.Extensions.Logging;
 
 namespace IkIheMusicBot.Services {
+	// Class should probably be renamed to LavalinkGuildManager or something, but whatever.
 	public class LavalinkQueue {
 		private readonly NotificationService m_Notifications;
 		private readonly ILogger<LavalinkQueue> m_Logger;
@@ -28,7 +29,7 @@ namespace IkIheMusicBot.Services {
 			}
 		}
 
-		public LavalinkQueue(LavalinkGuildConnection guildConnection, NotificationService notifications, ILogger<LavalinkQueue> logger, bool autoPause) {
+		public LavalinkQueue(LavalinkGuildConnection guildConnection, NotificationService notifications, ILogger<LavalinkQueue> logger) {
 			m_GuildConnection = guildConnection;
 			m_Notifications = notifications;
 			m_Logger = logger;
@@ -79,23 +80,12 @@ namespace IkIheMusicBot.Services {
 				}
 			};
 
-			if (autoPause) {
-				// This is necessary for 24/7 bots as they stop playing at random intervals, typically 1 or 2 days after you start them.
-				// Initially I would restart the bots to fix this but I've found that simply pausing and resuming playback is sufficient.
-				// AutoPause will pause playback when nobody is listening and resume it when someone joins.
-				m_GuildConnection.Node.Discord.VoiceStateUpdated += (o, e) => {
-					if (m_GuildConnection.Channel.Users.All(user => user.Id == o.CurrentUser.Id || user.Id == e.User.Id)) {
-						bool wasInChannel = e.Before?.Channel?.Id == m_GuildConnection.Channel.Id;
-						bool nowInChannel = e.After?.Channel?.Id == m_GuildConnection.Channel.Id;
-						if (wasInChannel && !nowInChannel) {
-							return m_GuildConnection.PauseAsync();
-						} else {
-							return m_GuildConnection.ResumeAsync();
-						}
-					}
-					return Task.CompletedTask;
-				};
-			}
+			// This is necessary for 24/7 bots as they stop playing at random intervals, typically 1 or 2 days after you start them.
+			// Initially I would restart the bots to fix this but I've found that simply pausing and resuming playback is sufficient.
+			m_GuildConnection.DiscordWebSocketClosed += async (o, e) => {
+				await m_GuildConnection.PauseAsync();
+				await m_GuildConnection.ResumeAsync();
+			};
 		}
 
 		public Task AddToQueueAsync(LavalinkTrack track) {

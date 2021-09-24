@@ -29,7 +29,7 @@ namespace IkIheMusicBot.Services {
 				// Would very much like for this line to be moved out of this lambda and properly awaited
 				// It cannot be awaited because it is a parameter to LavalinkQueue, though some ugly restructuring could fix this
 				LavalinkGuildConnection gc = lnc.ConnectAsync(channel).GetAwaiter().GetResult();
-				return new LavalinkQueue(gc, m_Notifications, m_LoggerFactory.CreateLogger<LavalinkQueue>(), true);
+				return new LavalinkQueue(gc, m_Notifications, m_LoggerFactory.CreateLogger<LavalinkQueue>());
 			});
 			
 			LavalinkGuildConnection gc = queue.GetGuildConnection();
@@ -39,10 +39,10 @@ namespace IkIheMusicBot.Services {
 				// TODO this really should not be in here, consider making a PR to lavaplayer for local m3u support.
 				string[] lines = await File.ReadAllLinesAsync(searchOrUri);
 				var tracks = new List<LavalinkTrack>(lines.Length);
-				foreach (string line_ in lines) {
-					string line = line_;
+				foreach (string line in lines) {
+					string path = line;
 					if (!Path.IsPathRooted(line)) {
-						line = Path.Combine(Path.GetDirectoryName(searchOrUri)!, line);
+						path = Path.Combine(Path.GetDirectoryName(searchOrUri)!, line);
 					}
 					LavalinkLoadResult loadResult = await gc.Node.Rest.GetTracksAsync(line, LavalinkSearchType.Plain);
 					if (loadResult.LoadResultType == LavalinkLoadResultType.TrackLoaded) {
