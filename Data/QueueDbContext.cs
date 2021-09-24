@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 using Microsoft.EntityFrameworkCore;
 
 namespace IkIheMusicBot {
@@ -7,9 +8,8 @@ namespace IkIheMusicBot {
 		public DbSet<GuildQueue> GuildQueues { get; set; }
 	}
 
-	[Index(nameof(DiscordGuildId), IsUnique = true)]
 	public class GuildQueue {
-		public Guid Id { get; set; }
+		[Key]
 		public ulong DiscordGuildId { get; set; }
 		public ulong DiscordChannelId { get; set; }
 		public bool Repeating { get; set; }

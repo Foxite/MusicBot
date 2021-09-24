@@ -3,7 +3,7 @@ using System.Linq;
 using DSharpPlus.Entities;
 using Microsoft.Extensions.Options;
 
-namespace IkIheMusicBot.Services {
+namespace IkIheMusicBot {
 	public class DjRoleService {
 		private readonly DjRoleConfig m_Config;
 		

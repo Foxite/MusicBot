@@ -6,7 +6,7 @@ using System.Text;
 using System.Threading.Tasks;
 using DSharpPlus.Entities;
 using DSharpPlus.Lavalink;
-using IkIheMusicBot.Services;
+using IkIheMusicBot;
 using Microsoft.Extensions.Options;
 using Org.BouncyCastle.Crypto.Tls;
 using Qmmands;

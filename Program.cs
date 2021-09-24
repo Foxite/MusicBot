@@ -9,16 +9,13 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using DSharpPlus;
 using DSharpPlus.Entities;
-using DSharpPlus.EventArgs;
 using DSharpPlus.Lavalink;
 using DSharpPlus.Net;
 using Foxite.Common.Notifications;
-using IkIheMusicBot.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using Qmmands;
 
 namespace IkIheMusicBot {
@@ -43,19 +40,21 @@ namespace IkIheMusicBot {
 					isc.Configure<LavalinkConfig>(ctx.Configuration.GetSection("LavalinkConfig"));
 
 					isc.AddDbContext<QueueDbContext>(GetEntityFrameworkConfigurator(ctx.Configuration.GetSection("Database")));
+					isc.AddSingleton<QueuePersistenceService>();
 
 					isc.AddSingleton(isp => new DiscordClient(new DSharpPlus.DiscordConfiguration() {
-						Token = isp.GetRequiredService<IOptions<DiscordConfiguration>>().Value.Token,
+						Token = isp.GetOptions<DiscordConfiguration>().Value.Token,
 						LoggerFactory = isp.GetRequiredService<ILoggerFactory>()
 					}));
 					isc.AddSingleton(isp => isp.GetRequiredService<DiscordClient>().UseLavalink());
 					isc.AddSingleton<LavalinkManager>();
 
-					isc.AddSingleton(isp => new CommandService(isp.GetRequiredService<IOptions<CommandServiceConfiguration>>().Value));
+					isc.AddSingleton(isp => new CommandService(isp.GetOptions<CommandServiceConfiguration>().Value));
 					isc.AddSingleton<CommandManager>();
+					isc.AddTransient<CommandHandler>();
 					
 					isc.AddSingleton<DjRoleService>();
-
+					
 					isc.AddNotifications()
 						.AddDiscord(ctx.Configuration.GetSection("Notifications").GetSection("Discord"));
 				})
@@ -65,7 +64,7 @@ namespace IkIheMusicBot {
 			var lavalink = host.Services.GetRequiredService<LavalinkExtension>();
 
 			discord.Ready += (o, eventArgs) => {
-				_ = Task.Run(() => RestartQueuesAsync(host));
+				_ = Task.Run(() => host.Services.GetRequiredService<QueuePersistenceService>().RestartQueuesAsync());
 				return Task.CompletedTask;
 			};
 
@@ -80,10 +79,10 @@ namespace IkIheMusicBot {
 				}
 			};
 
-			discord.InteractionCreated += (DiscordClient sender, InteractionCreateEventArgs eventArgs) => {
+			discord.InteractionCreated += (sender, eventArgs) => {
 				if (eventArgs.Interaction.Type == InteractionType.ApplicationCommand && eventArgs.Interaction.ApplicationId == sender.CurrentApplication.Id) {
 					eventArgs.Handled = true;
-					_ = HandleCommandAsync(host.Services, eventArgs.Interaction);
+					_ = host.Services.GetRequiredService<CommandHandler>().HandleCommandAsync(eventArgs.Interaction);
 				}
 				return Task.CompletedTask;
 			};
@@ -94,7 +93,7 @@ namespace IkIheMusicBot {
 			commandManager.Loading += (_, service, _) => service.AddModules(Assembly.GetExecutingAssembly());
 			await commandManager.ReloadCommandsAsync(startDiscord);
 			
-			LavalinkConfig lavalinkConfig = host.Services.GetRequiredService<IOptions<LavalinkConfig>>().Value;
+			LavalinkConfig lavalinkConfig = host.Services.GetOptions<LavalinkConfig>().Value;
 
 			var endpoint = new ConnectionEndpoint {
 				Hostname = lavalinkConfig.Hostname,
@@ -110,38 +109,6 @@ namespace IkIheMusicBot {
 			await host.RunAsync();
 			
 			host.Dispose();
-		}
-
-		private static async Task RestartQueuesAsync(IHost host) {
-			var dbContext = host.Services.GetRequiredService<QueueDbContext>();
-			var logger = host.Services.GetRequiredService<ILogger<Program>>();
-			var discord = host.Services.GetRequiredService<DiscordClient>();
-
-			Exception? firstException = null;
-			int failCount = 0;
-			foreach (var savedQueue in dbContext.GuildQueues) {
-				try {
-					var lavalinkManager = host.Services.GetRequiredService<LavalinkManager>();
-					DiscordGuild guild = await discord.GetGuildAsync(savedQueue.DiscordGuildId);
-					IReadOnlyList<DiscordChannel> channels = await guild.GetChannelsAsync();
-					foreach (GuildQueueTrack savedTrack in savedQueue.Tracks) {
-						await lavalinkManager.QueueAsync(channels.First(channel => channel.Id == savedQueue.DiscordChannelId), savedTrack.TrackUri.ToString(), LavalinkSearchType.Plain);
-					}
-					lavalinkManager.SetRepeating(guild, savedQueue.Repeating);
-				} catch (Exception e) {
-					logger.LogError(e, "Failed to restore saved queue for guild {0}", savedQueue.DiscordGuildId);
-					failCount++;
-					firstException ??= e;
-				}
-			}
-
-			if (firstException != null) {
-				try {
-					await host.Services.GetRequiredService<NotificationService>().SendNotificationAsync($"Failed to restore saved queues for {failCount} guilds. First exception: {firstException.ToStringDemystified()}");
-				} catch (Exception e) {
-					logger.LogCritical(e, "Could not send error notification for failed restores");
-				}
-			}
 		}
 
 		public static Action<DbContextOptionsBuilder> GetEntityFrameworkConfigurator(IConfiguration config) {
@@ -171,68 +138,6 @@ namespace IkIheMusicBot {
 			dbOptions.UseNpgsql(connectionString, npgsqlOptions => {
 				npgsqlOptions.MigrationsAssembly(Assembly.GetExecutingAssembly().GetName().Name);
 			});
-		}
-
-		private static async Task HandleCommandAsync(IServiceProvider services, DiscordInteraction interaction) {
-			var logger = services.GetRequiredService<ILogger<Program>>();
-			await interaction.CreateResponseAsync(InteractionResponseType.DeferredChannelMessageWithSource);
-			try {
-				int optionCount = (interaction.Data.Options ?? Array.Empty<DiscordInteractionDataOption>()).Count();
-				Command? command = services.GetRequiredService<CommandService>().FindCommands(interaction.Data.Name)
-					.FirstOrDefault(commandMatch => optionCount == commandMatch.Command.Parameters.Count)?.Command;
-				if (command != null) {
-					IEnumerable<object> parameters = (interaction.Data.Options ?? Array.Empty<DiscordInteractionDataOption>()).Select(option => option.Type switch {
-						// TODO implement proper type parsers
-						//ApplicationCommandOptionType.Channel => ctx.Channel.Guild.GetChannel((ulong) option.Value),
-						//ApplicationCommandOptionType.User => discord.GetUserAsync((ulong) option.Value).GetAwaiter().GetResult(), // deadlock?
-						//ApplicationCommandOptionType.Role => ctx.Channel.Guild.GetRole((ulong) option.Value),
-						_ => option.Value
-					});
-					DiscordMember member = await interaction.Guild.GetMemberAsync(interaction.User.Id);
-					var ctx = new DiscordCommandContext(services, interaction, member);
-					IResult result = await command.ExecuteAsync(parameters, ctx);
-					if (result is CommandExecutionFailedResult cefr) {
-						logger.LogError(cefr.Exception, "Error while executing command");
-						await interaction.CreateFollowupMessageAsync(new DiscordFollowupMessageBuilder() {
-							Content = "There was an unhandled error while executing the command.",
-						});
-						await services.GetRequiredService<NotificationService>().SendNotificationAsync(cefr.Exception.ToStringDemystified());
-					} else if (result is ChecksFailedResult cfr) {
-						var response = new StringBuilder("One or more checks have failed: ");
-						if (cfr.FailedChecks.Count > 1) {
-							response.AppendLine();
-							foreach ((Qmmands.CheckAttribute _, CheckResult checkResult) in cfr.FailedChecks.Where(tuple => !tuple.Result.IsSuccessful)) {
-								response.AppendLine($"- {checkResult.FailureReason}");
-							}
-						} else {
-							response.Append(cfr.FailedChecks[0].Result.FailureReason);
-						}
-						await interaction.CreateFollowupMessageAsync(new DiscordFollowupMessageBuilder() {
-							Content = response.ToString(),
-						}); 
-					} else if (result is SuccessfulResult) {
-						await interaction.CreateFollowupMessageAsync(new DiscordFollowupMessageBuilder() {
-							Content = "No result (successful)"
-						});
-					} else if (result is CommandResult cr) {
-						var messageBuilder = new DiscordFollowupMessageBuilder();
-						await cr.HandleAsync(ctx, messageBuilder);
-						await interaction.CreateFollowupMessageAsync(messageBuilder);
-					} else {
-						throw new Exception("Invalid result type " + (result?.GetType().FullName ?? "null"));
-					}
-				} else {
-					await interaction.CreateFollowupMessageAsync(new DiscordFollowupMessageBuilder() {
-						Content = "Parameter mismatch."
-					});
-				}
-			} catch (Exception e) {
-				logger.LogCritical(e, "Error while handling command");
-				await services.GetRequiredService<NotificationService>().SendNotificationAsync(e.ToStringDemystified());
-				await interaction.CreateFollowupMessageAsync(new DiscordFollowupMessageBuilder() {
-					Content = "There was a serious unhandled error while executing the command.",
-				});
-			}
 		}
 	}
 }

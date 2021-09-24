@@ -9,7 +9,7 @@ using DSharpPlus.Lavalink;
 using Foxite.Common.Notifications;
 using Microsoft.Extensions.Logging;
 
-namespace IkIheMusicBot.Services {
+namespace IkIheMusicBot {
 	public class LavalinkManager : IAsyncDisposable {
 		private readonly Func<QueueDbContext> m_QueueDbContextFactory;
 		private readonly ILoggerFactory m_LoggerFactory;
@@ -142,12 +142,15 @@ namespace IkIheMusicBot.Services {
 			}
 		}
 		
-		public async ValueTask DisposeAsync() {
+		// TODO make this more efficient and run it on an interval
+		private ValueTask SaveQueuesAsync() {
 			QueueDbContext dbContext = m_QueueDbContextFactory();
 			foreach (var queue in m_Queues.Values) {
 				queue.SaveQueue(dbContext);
 			}
-			await dbContext.SaveChangesAsync();
+			return new ValueTask(dbContext.SaveChangesAsync());
 		}
+		
+		public ValueTask DisposeAsync() => SaveQueuesAsync();
 	}
 }

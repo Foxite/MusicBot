@@ -1,6 +1,6 @@
 using System.Linq;
 using System.Threading.Tasks;
-using IkIheMusicBot.Services;
+using IkIheMusicBot;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Qmmands;

@@ -10,7 +10,7 @@ using Foxite.Common.Notifications;
 using Foxite.Common;
 using Microsoft.Extensions.Logging;
 
-namespace IkIheMusicBot.Services {
+namespace IkIheMusicBot {
 	// Class should probably be renamed to LavalinkGuildManager or something, but whatever.
 	public class LavalinkQueue {
 		private readonly NotificationService m_Notifications;
@@ -177,6 +177,7 @@ namespace IkIheMusicBot.Services {
 
 		public void SaveQueue(QueueDbContext dbContext) {
 			lock (m_Queue) {
+				// TODO this doesnt work properly, they never get deleted
 				dbContext.GuildQueues.Add(new GuildQueue() {
 					DiscordGuildId = m_GuildConnection.Guild.Id,
 					DiscordChannelId = m_GuildConnection.Channel.Id,
