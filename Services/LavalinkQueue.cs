@@ -85,8 +85,8 @@ namespace IkIheMusicBot.Services {
 				// AutoPause will pause playback when nobody is listening and resume it when someone joins.
 				m_GuildConnection.Node.Discord.VoiceStateUpdated += (o, e) => {
 					if (m_GuildConnection.Channel.Users.All(user => user.Id == o.CurrentUser.Id || user.Id == e.User.Id)) {
-						bool wasInChannel = e.Before.Channel?.Id == m_GuildConnection.Channel.Id;
-						bool nowInChannel = e.After.Channel?.Id == m_GuildConnection.Channel.Id;
+						bool wasInChannel = e.Before?.Channel?.Id == m_GuildConnection.Channel.Id;
+						bool nowInChannel = e.After?.Channel?.Id == m_GuildConnection.Channel.Id;
 						if (wasInChannel && !nowInChannel) {
 							return m_GuildConnection.PauseAsync();
 						} else {
