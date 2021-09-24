@@ -84,16 +84,12 @@ namespace IkIheMusicBot.Services {
 				// Initially I would restart the bots to fix this but I've found that simply pausing and resuming playback is sufficient.
 				// AutoPause will pause playback when nobody is listening and resume it when someone joins.
 				m_GuildConnection.Node.Discord.VoiceStateUpdated += (o, e) => {
-					m_Logger.LogInformation("aaa");
 					if (m_GuildConnection.Channel.Users.All(user => user.Id == o.CurrentUser.Id || user.Id == e.User.Id)) {
-						m_Logger.LogInformation("bbb");
 						bool wasInChannel = e.Before.Channel?.Id == m_GuildConnection.Channel.Id;
 						bool nowInChannel = e.After.Channel?.Id == m_GuildConnection.Channel.Id;
 						if (wasInChannel && !nowInChannel) {
-							m_Logger.LogInformation("ccc");
 							return m_GuildConnection.PauseAsync();
 						} else {
-							m_Logger.LogInformation("ddd");
 							return m_GuildConnection.ResumeAsync();
 						}
 					}
