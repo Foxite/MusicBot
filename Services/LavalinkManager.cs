@@ -4,7 +4,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
-using AngleSharp.Dom;
 using DSharpPlus.Entities;
 using DSharpPlus.Lavalink;
 using Foxite.Common.Notifications;
@@ -27,16 +26,17 @@ namespace IkIheMusicBot.Services {
 		public async Task<IReadOnlyList<LavalinkTrack>> QueueAsync(DiscordChannel channel, string searchOrUri, LavalinkSearchType searchType) {
 			LavalinkQueue queue = m_Queues.GetOrAdd(channel.Guild, _ => {
 				LavalinkNodeConnection lnc = Lavalink.GetIdealNodeConnection();
-				// 2021-09-20 Would very much like for this line to be moved out of this lambda and properly awaited
-				// 2021-09-22 I forgot what prevents me from doing so, but I don't have time to figure it out right now TODO move it out
+				// Would very much like for this line to be moved out of this lambda and properly awaited
+				// It cannot be awaited because it is a parameter to LavalinkQueue, though some ugly restructuring could fix this
 				LavalinkGuildConnection gc = lnc.ConnectAsync(channel).GetAwaiter().GetResult();
-				return new LavalinkQueue(gc, m_Notifications, m_LoggerFactory.CreateLogger<LavalinkQueue>());
+				return new LavalinkQueue(gc, m_Notifications, m_LoggerFactory.CreateLogger<LavalinkQueue>(), true);
 			});
 			
 			LavalinkGuildConnection gc = queue.GetGuildConnection();
 			
 			LavalinkLoadResult result;
 			if (searchType == LavalinkSearchType.Plain && searchOrUri.StartsWith("/") && searchOrUri.EndsWith(".m3u")) {
+				// TODO this really should not be in here, consider making a PR to lavaplayer for local m3u support.
 				string[] lines = await File.ReadAllLinesAsync(searchOrUri);
 				var tracks = new List<LavalinkTrack>(lines.Length);
 				foreach (string line_ in lines) {

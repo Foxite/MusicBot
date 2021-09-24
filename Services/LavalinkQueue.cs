@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using DSharpPlus.Lavalink;
 using DSharpPlus.Lavalink.EventArgs;
 using Foxite.Common.Notifications;
+using Foxite.Common;
 using Microsoft.Extensions.Logging;
 
 namespace IkIheMusicBot.Services {
@@ -27,7 +28,7 @@ namespace IkIheMusicBot.Services {
 			}
 		}
 
-		public LavalinkQueue(LavalinkGuildConnection guildConnection, NotificationService notifications, ILogger<LavalinkQueue> logger) {
+		public LavalinkQueue(LavalinkGuildConnection guildConnection, NotificationService notifications, ILogger<LavalinkQueue> logger, bool autoPause) {
 			m_GuildConnection = guildConnection;
 			m_Notifications = notifications;
 			m_Logger = logger;
@@ -35,17 +36,23 @@ namespace IkIheMusicBot.Services {
 			m_QueueLock = new object();
 
 			m_GuildConnection.TrackException += (_, e) => {
-				m_Logger.LogError("TrackException event: guild id: {0}; error: {1}", m_GuildConnection.Guild.Id, e.Error);
-				return m_Notifications.SendNotificationAsync($"TrackException event: guild id: {m_GuildConnection.Guild.Id}; error: {e.Error}");
+				FormattableString message = $"TrackException event: guild id: {m_GuildConnection.Guild.Id}; error: {e.Error}";
+				m_Logger.LogError(message);
+				return m_Notifications.SendNotificationAsync(message.ToString());
 			};
 
 			m_GuildConnection.TrackStuck += (_, e) => {
-				m_Logger.LogError("TrackStuck event: guild id: {0}; threshold: {1}", m_GuildConnection.Guild.Id, e.ThresholdMilliseconds);
-				return m_Notifications.SendNotificationAsync($"TrackException event: guild id: {m_GuildConnection.Guild.Id}; threshold: {e.ThresholdMilliseconds}");
+				FormattableString message = $"TrackException event: guild id: {m_GuildConnection.Guild.Id}; threshold: {e.ThresholdMilliseconds}";
+				m_Logger.LogError(message);
+				return m_Notifications.SendNotificationAsync(message.ToString());
 			};
-
+			
 			// This seems to happen pretty often and is not a cause for concern, the library fixes it automatically
-			//m_GuildConnection.DiscordWebSocketClosed += (_, e) => { };
+			m_GuildConnection.DiscordWebSocketClosed += (_, e) => {
+				FormattableString message = $"DiscordWebSocketClosed event: guild id: {m_GuildConnection.Guild.Id}; code: {e.Code}; reason: {e.Reason}; remote: {e.Remote}";
+				m_Logger.LogError(message);
+				return m_Notifications.SendNotificationAsync(message.ToString());
+			};
 
 			m_GuildConnection.PlaybackFinished += (_, e) => {
 				try {
@@ -69,9 +76,30 @@ namespace IkIheMusicBot.Services {
 				} catch (Exception exception) {
 					m_Logger.LogError(exception, "Failed to proceed to next track in guild id {0}", m_GuildConnection.Guild.Id);
 					return m_Notifications.SendNotificationAsync($"Failed to proceed to next track: guild id: {m_GuildConnection.Guild.Id}; exception: {exception.ToStringDemystified()}");
-					//throw;
 				}
 			};
+
+			if (autoPause) {
+				// This is necessary for 24/7 bots as they stop playing at random intervals, typically 1 or 2 days after you start them.
+				// Initially I would restart the bots to fix this but I've found that simply pausing and resuming playback is sufficient.
+				// AutoPause will pause playback when nobody is listening and resume it when someone joins.
+				m_GuildConnection.Node.Discord.VoiceStateUpdated += (o, e) => {
+					m_Logger.LogInformation("aaa");
+					if (m_GuildConnection.Channel.Users.All(user => user.Id == o.CurrentUser.Id || user.Id == e.User.Id)) {
+						m_Logger.LogInformation("bbb");
+						bool wasInChannel = e.Before.Channel?.Id == m_GuildConnection.Channel.Id;
+						bool nowInChannel = e.After.Channel?.Id == m_GuildConnection.Channel.Id;
+						if (wasInChannel && !nowInChannel) {
+							m_Logger.LogInformation("ccc");
+							return m_GuildConnection.PauseAsync();
+						} else {
+							m_Logger.LogInformation("ddd");
+							return m_GuildConnection.ResumeAsync();
+						}
+					}
+					return Task.CompletedTask;
+				};
+			}
 		}
 
 		public Task AddToQueueAsync(LavalinkTrack track) {
