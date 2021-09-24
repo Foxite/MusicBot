@@ -1,13 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Diagnostics.Contracts;
 using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
-using Discord;
 using DSharpPlus;
 using DSharpPlus.Entities;
 using DSharpPlus.EventArgs;
@@ -18,6 +16,7 @@ using IkIheMusicBot.Services;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Qmmands;
 
@@ -43,7 +42,8 @@ namespace IkIheMusicBot {
 					isc.Configure<StartupConfig>(ctx.Configuration.GetSection("StartupConfig"));
 
 					isc.AddSingleton(isp => new DiscordClient(new DSharpPlus.DiscordConfiguration() {
-						Token = isp.GetRequiredService<IOptions<DiscordConfiguration>>().Value.Token
+						Token = isp.GetRequiredService<IOptions<DiscordConfiguration>>().Value.Token,
+						LoggerFactory = isp.GetRequiredService<ILoggerFactory>()
 					}));
 					isc.AddSingleton(isp => isp.GetRequiredService<DiscordClient>().UseLavalink());
 					isc.AddSingleton<LavalinkManager>();
@@ -110,6 +110,8 @@ namespace IkIheMusicBot {
 			await lavalink.ConnectAsync(lavalinkConfig2);
 
 			await host.RunAsync();
+			
+			host.Dispose();
 		}
 
 		private static async Task HandleCommandAsync(IServiceProvider services, DiscordInteraction interaction) {
