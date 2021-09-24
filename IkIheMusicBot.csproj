@@ -13,7 +13,7 @@
 
     <ItemGroup>
       <PackageReference Include="Ben.Demystifier" Version="0.4.1" />
-      <PackageReference Include="Foxite.Common" Version="1.4.1" />
+      <PackageReference Include="Foxite.Common" Version="1.5.3" />
       <PackageReference Include="Foxite.DSharpPlus.Lavalink" Version="4.1.0" />
       <PackageReference Include="Microsoft.EntityFrameworkCore" Version="5.0.10" />
       <PackageReference Include="Microsoft.Extensions.Configuration.NewtonsoftJson" Version="5.0.1" />

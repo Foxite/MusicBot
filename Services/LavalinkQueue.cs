@@ -6,9 +6,15 @@ using System.Linq;
 using System.Threading.Tasks;
 using DSharpPlus.Lavalink;
 using DSharpPlus.Lavalink.EventArgs;
+using Foxite.Common.Notifications;
+using Foxite.Common;
+using Microsoft.Extensions.Logging;
 
 namespace IkIheMusicBot.Services {
+	// Class should probably be renamed to LavalinkGuildManager or something, but whatever.
 	public class LavalinkQueue {
+		private readonly NotificationService m_Notifications;
+		private readonly ILogger<LavalinkQueue> m_Logger;
 		private readonly LavalinkGuildConnection m_GuildConnection;
 		private readonly LinkedList<LavalinkTrack> m_Queue;
 		private readonly object m_QueueLock;
@@ -23,10 +29,31 @@ namespace IkIheMusicBot.Services {
 			}
 		}
 
-		public LavalinkQueue(LavalinkGuildConnection guildConnection) {
+		public LavalinkQueue(LavalinkGuildConnection guildConnection, NotificationService notifications, ILogger<LavalinkQueue> logger) {
 			m_GuildConnection = guildConnection;
+			m_Notifications = notifications;
+			m_Logger = logger;
 			m_Queue = new LinkedList<LavalinkTrack>();
 			m_QueueLock = new object();
+
+			m_GuildConnection.TrackException += (_, e) => {
+				FormattableString message = $"TrackException event: guild id: {m_GuildConnection.Guild.Id}; error: {e.Error}";
+				m_Logger.LogError(message);
+				return m_Notifications.SendNotificationAsync(message.ToString());
+			};
+
+			m_GuildConnection.TrackStuck += (_, e) => {
+				FormattableString message = $"TrackException event: guild id: {m_GuildConnection.Guild.Id}; threshold: {e.ThresholdMilliseconds}";
+				m_Logger.LogError(message);
+				return m_Notifications.SendNotificationAsync(message.ToString());
+			};
+			
+			// This seems to happen pretty often and is not a cause for concern, the library fixes it automatically
+			m_GuildConnection.DiscordWebSocketClosed += (_, e) => {
+				FormattableString message = $"DiscordWebSocketClosed event: guild id: {m_GuildConnection.Guild.Id}; code: {e.Code}; reason: {e.Reason}; remote: {e.Remote}";
+				m_Logger.LogError(message);
+				return m_Notifications.SendNotificationAsync(message.ToString());
+			};
 
 			m_GuildConnection.PlaybackFinished += (_, e) => {
 				try {
@@ -38,14 +65,26 @@ namespace IkIheMusicBot.Services {
 								}
 								m_Queue.RemoveFirst();
 								return NextSongAsync();
+							} else {
+								m_Queue.RemoveFirst();
+								return Task.CompletedTask;
 							}
 						}
+					} else {
+						m_Logger.LogError("Failed to proceed to next track in guild id {0}; track end reason is {1}", m_GuildConnection.Guild.Id, e.Reason);
+						return m_Notifications.SendNotificationAsync($"Failed to proceed to next track; track end reason is {e.Reason}");
 					}
-					return Task.CompletedTask;
 				} catch (Exception exception) {
-					Console.WriteLine("Failed to proceed to next track: " + exception.ToStringDemystified());
-					throw;
+					m_Logger.LogError(exception, "Failed to proceed to next track in guild id {0}", m_GuildConnection.Guild.Id);
+					return m_Notifications.SendNotificationAsync($"Failed to proceed to next track: guild id: {m_GuildConnection.Guild.Id}; exception: {exception.ToStringDemystified()}");
 				}
+			};
+
+			// This is necessary for 24/7 bots as they stop playing at random intervals, typically 1 or 2 days after you start them.
+			// Initially I would restart the bots to fix this but I've found that simply pausing and resuming playback is sufficient.
+			m_GuildConnection.DiscordWebSocketClosed += async (o, e) => {
+				await m_GuildConnection.PauseAsync();
+				await m_GuildConnection.ResumeAsync();
 			};
 		}
 

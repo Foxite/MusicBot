@@ -4,47 +4,50 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
-using AngleSharp.Dom;
 using DSharpPlus.Entities;
 using DSharpPlus.Lavalink;
+using Foxite.Common.Notifications;
+using Microsoft.Extensions.Logging;
 
 namespace IkIheMusicBot.Services {
 	public class LavalinkManager : IAsyncDisposable {
 		private readonly Func<QueueDbContext> m_QueueDbContextFactory;
+		private readonly ILoggerFactory m_LoggerFactory;
+		private readonly NotificationService m_Notifications;
 		private readonly ConcurrentDictionary<DiscordGuild, LavalinkQueue> m_Queues;
 		
 		public LavalinkExtension Lavalink { get; }
 
-		public LavalinkManager(LavalinkExtension lavalink, Func<QueueDbContext> queueDbContextFactory) {
+		public LavalinkManager(LavalinkExtension lavalink, ILoggerFactory loggerFactory, NotificationService notifications, Func<QueueDbContext> queueDbContextFactory) {
 			m_QueueDbContextFactory = queueDbContextFactory;
+			m_LoggerFactory = loggerFactory;
+			m_Notifications = notifications;
 			Lavalink = lavalink;
 			m_Queues = new ConcurrentDictionary<DiscordGuild, LavalinkQueue>();
-		}
-
-		private LavalinkQueue GetLavalinkQueue(DiscordGuild guild) {
-			return m_Queues.GetOrAdd(guild, _ => new LavalinkQueue(Lavalink.GetIdealNodeConnection().GetGuildConnection(guild)));
 		}
 
 		public async Task<IReadOnlyList<LavalinkTrack>> QueueAsync(DiscordChannel channel, string searchOrUri, LavalinkSearchType searchType) {
 			LavalinkQueue queue = m_Queues.GetOrAdd(channel.Guild, _ => {
 				LavalinkNodeConnection lnc = Lavalink.GetIdealNodeConnection();
 				// Would very much like for this line to be moved out of this lambda and properly awaited
+				// It cannot be awaited because it is a parameter to LavalinkQueue, though some ugly restructuring could fix this
 				LavalinkGuildConnection gc = lnc.ConnectAsync(channel).GetAwaiter().GetResult();
-				return new LavalinkQueue(gc);
+				return new LavalinkQueue(gc, m_Notifications, m_LoggerFactory.CreateLogger<LavalinkQueue>());
 			});
 			
 			LavalinkGuildConnection gc = queue.GetGuildConnection();
 			
 			LavalinkLoadResult result;
 			if (searchType == LavalinkSearchType.Plain && searchOrUri.StartsWith("/") && searchOrUri.EndsWith(".m3u")) {
+				// TODO this really should not be in here, consider making a PR to lavaplayer for local m3u support.
 				string[] lines = await File.ReadAllLinesAsync(searchOrUri);
 				var tracks = new List<LavalinkTrack>(lines.Length);
-				foreach (string line_ in lines) {
-					string line = line_;
+				foreach (string line in lines) {
+					string path = line;
 					if (!Path.IsPathRooted(line)) {
-						line = Path.Combine(Path.GetDirectoryName(searchOrUri)!, line);
+						path = Path.Combine(Path.GetDirectoryName(searchOrUri)!, line);
 					}
-					LavalinkLoadResult loadResult = await gc.Node.Rest.GetTracksAsync(line, LavalinkSearchType.Plain);
+					LavalinkLoadResult loadResult = await gc.Node.Rest.GetTracksAsync(path, LavalinkSearchType.Plain);
 					if (loadResult.LoadResultType == LavalinkLoadResultType.TrackLoaded) {
 						tracks.Add(loadResult.Tracks.First());
 						await queue.AddToQueueAsync(loadResult.Tracks.First());
@@ -57,12 +60,12 @@ namespace IkIheMusicBot.Services {
 
 			if (result.LoadResultType == LavalinkLoadResultType.PlaylistLoaded) {
 				foreach (LavalinkTrack track in result.Tracks) {
-					await GetLavalinkQueue(channel.Guild).AddToQueueAsync(track);
+					await queue.AddToQueueAsync(track);
 				}
 				return result.Tracks.ToList();
 			} else if (result.LoadResultType is LavalinkLoadResultType.SearchResult or LavalinkLoadResultType.TrackLoaded) {
 				LavalinkTrack track = result.Tracks.First();
-				await GetLavalinkQueue(channel.Guild).AddToQueueAsync(track);
+				await queue.AddToQueueAsync(track);
 				return new[] { track };
 			} else if (result.LoadResultType is LavalinkLoadResultType.NoMatches) {
 				return Array.Empty<LavalinkTrack>();

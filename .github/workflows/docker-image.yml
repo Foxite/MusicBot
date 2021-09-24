@@ -1,0 +1,21 @@
+name: Docker Image CI
+
+on:
+  push:
+    branches: [ master ]
+#  pull_request:
+#    branches: [ master ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Publish Docker
+      uses: elgohr/Publish-Docker-Github-Action@3.04
+      with:
+        name: ik_ihe-music
+        registry: ${{ secrets.DEPLOY_REPO }}
+        username: ${{ secrets.DEPLOY_USERNAME }}
+        password: ${{ secrets.DEPLOY_PASSWD }}
+        default_branch: master

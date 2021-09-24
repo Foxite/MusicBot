@@ -35,6 +35,11 @@ namespace IkIheMusicBot {
 		[Command("play"), Description("Play something")]
 		[DjRole(OnlyIfRequired = true)]
 		public async Task<CommandResult> Play([Description("Search query or URL")] string search) {
+			DiscordChannel? voiceChannel = ((DiscordMember) Context.User).VoiceState?.Channel;
+			if (voiceChannel == null) {
+				return new TextResult(false, "You need to be in a voice channel for that.");
+			}
+			
 			LavalinkSearchType searchType;
 			if (Uri.TryCreate(search, UriKind.Absolute, out _)) {
 				if (search.StartsWith("/")) {
@@ -54,7 +59,7 @@ namespace IkIheMusicBot {
 			} else {
 				searchType = LavalinkSearchType.Youtube;
 			}
-			IReadOnlyList<LavalinkTrack> tracks = await Lavalink.QueueAsync(((DiscordMember) Context.User).VoiceState.Channel, search, searchType);
+			IReadOnlyList<LavalinkTrack> tracks = await Lavalink.QueueAsync(voiceChannel, search, searchType);
 			if (tracks.Count == 0) {
 				return new TextResult(false, "Added zero tracks");
 			} else if (tracks.Count == 1) {
@@ -151,11 +156,6 @@ namespace IkIheMusicBot {
 				ret.AppendLine($"+{queue.Count - 10} items");
 			}
 			return new TextResult(true, ret.ToString());
-		}
-
-		[Command("github"), Description("Get a link to the bot's source code")]
-		public CommandResult GithubLink() {
-			return new TextResult(true, "https://github.com/Foxite/MusicBot");
 		}
 	}
 
