@@ -37,15 +37,6 @@ namespace IkIheMusicBot.Services {
 			m_Logger = logger;
 			m_Queue = new LinkedList<LavalinkTrack>();
 			m_QueueLock = new object();
-
-			// This is an experimental mitigation for an issue where the bots go silent at random intervals
-			// I've noticed in the logs that this event is logged by Lavalink and a few hours later, somone discovers that the bot went silent and pauses/resumes it to fix it.
-			// Which is weird because I don't have the intent necessary to receive this event, and yet it is received anyway. When I join or leave voice, the event is not received.
-			// So my hypothesis is that this is some sort of Discord bug and Lavalink does not handle it well, and this is the way to fix it.
-			m_GuildConnection.Node.Discord.VoiceStateUpdated += async (o, e) => {
-				await m_GuildConnection.PauseAsync();
-				await m_GuildConnection.ResumeAsync();
-			};
 			
 			m_PauseResumeTimer = new Timer();
 			m_PauseResumeTimer.Elapsed += (o, e) => m_GuildConnection.PauseAsync().ContinueWith(_ => m_GuildConnection.ResumeAsync()).RunSynchronously();
