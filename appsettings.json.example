@@ -1,44 +1,61 @@
 {
-    "Logging": {
-        "LogLevel": {
-            "Default": "Debug",
-            "System": "Information",
-            "Microsoft": "Information"
-        }
-    },
-    "LavalinkConfig": {
-        "Hostname": "127.0.0.1",
-        "Port": 2333,
-        "Password": "youshallnotpass"
-    },
-    "CommandServiceConfiguration": {
-        "StringComparison": 5,
-        "DefaultRunMode": 0,
-        "IgnoresExtraArguments": false,
-        "Separator": " ",
-        "SeparatorRequirement": 0,
-        "DefaultArgumentParser": null,
-        "CooldownBucketKeyGenerator": null,
-        "QuotationMarkMap": null,
-        "NullableNouns": null
-    },
-    "DiscordConfiguration": {
-        "Token": ""
-    },
-    "Notifications": {
-        "Discord": {
-            "WebhookUrl": ""
-        }
-    },
-    "DjRoleConfig": {
-        "DjRoleIsRequired": false,
-        "RoleIds": [
-            
-        ]
-    },
-    "LocalMediaConfig": {
-        "AllowedPathPrefixes": [
-            
-        ]
-    }
+	"Logging": {
+		"LogLevel": {
+			"Default": "Debug",
+			"System": "Information",
+			"Microsoft": "Information"
+		}
+	},
+	"LavalinkConfig": {
+		"Hostname": "",
+		"Port": 2333,
+		"Password": "youshallnotpass"
+	},
+	"CommandServiceConfiguration": {
+		"StringComparison": 5,
+		"DefaultRunMode": 0,
+		"IgnoresExtraArguments": false,
+		"Separator": " ",
+		"SeparatorRequirement": 0,
+		"DefaultArgumentParser": null,
+		"CooldownBucketKeyGenerator": null,
+		"QuotationMarkMap": null,
+		"NullableNouns": null
+	},
+	"DiscordConfiguration": {
+		"Token": "",
+		"SlashCommandGuilds": [
+		
+		]
+	},
+	"Notifications": {
+		"Discord": {
+			"WebhookUrl": ""
+		}
+	},
+	"DjRoleConfig": {
+		"DjRoleIsRequired": false,
+		"RoleIds": [
+		
+		]
+	},
+	"LocalMediaConfig": {
+		"AllowedPathPrefixes": [
+		
+		]
+	},
+	"StartupConfig": {
+		"JoinGuild": 0,
+		"JoinChannel": 0,
+		"LoadTrack": "",
+		"Repeat": false
+	},
+	"Database": {
+		"Host": "",
+		"Port": 5432,
+		"Database": "musicbot-data",
+		"Username": "musicbot",
+		"Password": "",
+		"Encrypt": "Standard"
+	}
 }
