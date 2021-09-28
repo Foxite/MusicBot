@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using System.Timers;
 using DSharpPlus.Lavalink;
 using DSharpPlus.Lavalink.EventArgs;
 using Foxite.Common.Notifications;
@@ -17,6 +18,7 @@ namespace IkIheMusicBot.Services {
 		private readonly ILogger<LavalinkQueue> m_Logger;
 		private readonly LavalinkGuildConnection m_GuildConnection;
 		private readonly LinkedList<LavalinkTrack> m_Queue;
+		private readonly Timer m_PauseResumeTimer; // TODO dispose it
 		private readonly object m_QueueLock;
 
 		public bool Repeat { get; set; }
@@ -35,6 +37,15 @@ namespace IkIheMusicBot.Services {
 			m_Logger = logger;
 			m_Queue = new LinkedList<LavalinkTrack>();
 			m_QueueLock = new object();
+			
+			m_PauseResumeTimer = new Timer();
+			m_PauseResumeTimer.Elapsed +=
+				// This is necessary for 24/7 bots as they stop playing at random intervals, typically 1 or 2 days after you start them.
+				// Initially I would restart the bots to fix this but I've found that simply pausing and resuming playback is sufficient.
+				(o, e) => m_GuildConnection.PauseAsync().ContinueWith(_ => m_GuildConnection.ResumeAsync()).RunSynchronously();
+			m_PauseResumeTimer.Interval = TimeSpan.FromHours(6).TotalMilliseconds;
+			m_PauseResumeTimer.AutoReset = true;
+			m_PauseResumeTimer.Enabled = true;
 
 			m_GuildConnection.TrackException += (_, e) => {
 				FormattableString message = $"TrackException event: guild id: {m_GuildConnection.Guild.Id}; error: {e.Error}";
@@ -48,7 +59,6 @@ namespace IkIheMusicBot.Services {
 				return m_Notifications.SendNotificationAsync(message.ToString());
 			};
 			
-			// This seems to happen pretty often and is not a cause for concern, the library fixes it automatically
 			m_GuildConnection.DiscordWebSocketClosed += (_, e) => {
 				FormattableString message = $"DiscordWebSocketClosed event: guild id: {m_GuildConnection.Guild.Id}; code: {e.Code}; reason: {e.Reason}; remote: {e.Remote}";
 				m_Logger.LogError(message);
@@ -78,13 +88,6 @@ namespace IkIheMusicBot.Services {
 					m_Logger.LogError(exception, "Failed to proceed to next track in guild id {0}", m_GuildConnection.Guild.Id);
 					return m_Notifications.SendNotificationAsync($"Failed to proceed to next track: guild id: {m_GuildConnection.Guild.Id}; exception: {exception.ToStringDemystified()}");
 				}
-			};
-
-			// This is necessary for 24/7 bots as they stop playing at random intervals, typically 1 or 2 days after you start them.
-			// Initially I would restart the bots to fix this but I've found that simply pausing and resuming playback is sufficient.
-			m_GuildConnection.DiscordWebSocketClosed += async (o, e) => {
-				await m_GuildConnection.PauseAsync();
-				await m_GuildConnection.ResumeAsync();
 			};
 		}
 

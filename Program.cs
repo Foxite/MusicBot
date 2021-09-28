@@ -22,7 +22,7 @@ using Qmmands;
 
 namespace IkIheMusicBot {
 	public sealed class Program {
-		public static string ProgramVersion => "0.1.24";
+		public static string ProgramVersion => "0.1.25";
 	
 		// ReSharper disable AccessToDisposedClosure
 		private static async Task Main(string[] args) {

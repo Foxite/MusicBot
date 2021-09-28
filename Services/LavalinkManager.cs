@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -19,13 +20,16 @@ namespace IkIheMusicBot.Services {
 		public LavalinkManager(LavalinkExtension lavalink, ILoggerFactory loggerFactory, NotificationService notifications) {
 			m_LoggerFactory = loggerFactory;
 			m_Notifications = notifications;
-			Lavalink = lavalink;
 			m_Queues = new ConcurrentDictionary<DiscordGuild, LavalinkQueue>();
+			Lavalink = lavalink;
 		}
 
 		public async Task<IReadOnlyList<LavalinkTrack>> QueueAsync(DiscordChannel channel, string searchOrUri, LavalinkSearchType searchType) {
 			LavalinkQueue queue = m_Queues.GetOrAdd(channel.Guild, _ => {
 				LavalinkNodeConnection lnc = Lavalink.GetIdealNodeConnection();
+				if (!lnc.IsConnected) {
+					lnc.LavalinkSocketErrored += (o, e) => m_Notifications.SendNotificationAsync($"LavalinkSocketErrored event: {e.Exception.ToStringDemystified()}");
+				}
 				// Would very much like for this line to be moved out of this lambda and properly awaited
 				// It cannot be awaited because it is a parameter to LavalinkQueue, though some ugly restructuring could fix this
 				LavalinkGuildConnection gc = lnc.ConnectAsync(channel).GetAwaiter().GetResult();
@@ -44,7 +48,7 @@ namespace IkIheMusicBot.Services {
 					if (!Path.IsPathRooted(line)) {
 						path = Path.Combine(Path.GetDirectoryName(searchOrUri)!, line);
 					}
-					LavalinkLoadResult loadResult = await gc.Node.Rest.GetTracksAsync(line, LavalinkSearchType.Plain);
+					LavalinkLoadResult loadResult = await gc.Node.Rest.GetTracksAsync(path, LavalinkSearchType.Plain);
 					if (loadResult.LoadResultType == LavalinkLoadResultType.TrackLoaded) {
 						tracks.Add(loadResult.Tracks.First());
 						await queue.AddToQueueAsync(loadResult.Tracks.First());
