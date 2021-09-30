@@ -11,11 +11,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
-    - name: Publish Docker
-      uses: elgohr/Publish-Docker-Github-Action@3.04
+    - name: Publish Docker Image to GitHub Registry
+      uses: TilBlechschmidt/gp-docker-action@v0.2-alpha
       with:
-        name: ik_ihe-music
-        registry: ${{ secrets.DEPLOY_REPO }}
-        username: ${{ secrets.DEPLOY_USERNAME }}
-        password: ${{ secrets.DEPLOY_PASSWD }}
-        default_branch: master
+        github-token: ${{ secrets.PUSH_KEY }}
+        image-name: musicbot
