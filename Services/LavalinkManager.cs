@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
 using System.Threading.Tasks;
 using DSharpPlus.Entities;
 using DSharpPlus.Lavalink;
@@ -14,12 +15,14 @@ namespace IkIheMusicBot.Services {
 	public class LavalinkManager {
 		private readonly ILoggerFactory m_LoggerFactory;
 		private readonly NotificationService m_Notifications;
+		private readonly HttpClient m_Http;
 		public LavalinkExtension Lavalink { get; }
 		private readonly ConcurrentDictionary<DiscordGuild, LavalinkQueue> m_Queues;
 
-		public LavalinkManager(LavalinkExtension lavalink, ILoggerFactory loggerFactory, NotificationService notifications) {
+		public LavalinkManager(LavalinkExtension lavalink, ILoggerFactory loggerFactory, NotificationService notifications, HttpClient http) {
 			m_LoggerFactory = loggerFactory;
 			m_Notifications = notifications;
+			m_Http = http;
 			m_Queues = new ConcurrentDictionary<DiscordGuild, LavalinkQueue>();
 			Lavalink = lavalink;
 		}
@@ -39,13 +42,18 @@ namespace IkIheMusicBot.Services {
 			LavalinkGuildConnection gc = queue.GetGuildConnection();
 			
 			LavalinkLoadResult result;
-			if (searchType == LavalinkSearchType.Plain && searchOrUri.StartsWith("/") && searchOrUri.EndsWith(".m3u")) {
+			if (searchType == LavalinkSearchType.Plain && (searchOrUri.StartsWith("/") || searchOrUri.StartsWith("https://")) && searchOrUri.EndsWith(".m3u")) {
 				// TODO this really should not be in here, consider making a PR to lavaplayer for local m3u support.
-				string[] lines = await File.ReadAllLinesAsync(searchOrUri);
-				var tracks = new List<LavalinkTrack>(lines.Length);
+				IEnumerable<string> lines;
+				if (searchOrUri.StartsWith("/")) {
+					lines = await File.ReadAllLinesAsync(searchOrUri);
+				} else {
+					lines = (await m_Http.GetStringAsync(searchOrUri)).Split('\n').Select(str => str.Replace(" ", "%20"));
+				}
+				var tracks = new List<LavalinkTrack>();
 				foreach (string line in lines) {
 					string path = line;
-					if (!Path.IsPathRooted(line)) {
+					if (!Path.IsPathRooted(line) && !searchOrUri.StartsWith("https://")) {
 						path = Path.Combine(Path.GetDirectoryName(searchOrUri)!, line);
 					}
 					LavalinkLoadResult loadResult = await gc.Node.Rest.GetTracksAsync(path, LavalinkSearchType.Plain);

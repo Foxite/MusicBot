@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
 using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
@@ -22,7 +23,7 @@ using Qmmands;
 
 namespace IkIheMusicBot {
 	public sealed class Program {
-		public static string ProgramVersion => "0.1.27";
+		public static string ProgramVersion => "0.1.28";
 	
 		// ReSharper disable AccessToDisposedClosure
 		private static async Task Main(string[] args) {
@@ -53,6 +54,8 @@ namespace IkIheMusicBot {
 					isc.AddSingleton<CommandManager>();
 					
 					isc.AddSingleton<DjRoleService>();
+
+					isc.AddSingleton<HttpClient>();
 
 					isc.AddNotifications()
 						.AddDiscord(ctx.Configuration.GetSection("Notifications").GetSection("Discord"));
